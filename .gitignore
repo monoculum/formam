@@ -2,10 +2,12 @@
 *.o
 *.a
 *.so
+formam.iml
 
 # Folders
 _obj
 _test
+.idea
 
 # Architecture specific extensions/prefixes
 *.[568vq]
