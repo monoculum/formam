@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 	"fmt"
-	"github.com/gorilla/schema"
 	"github.com/ajg/form"
 	"net/url"
+	"encoding/json"
 )
 
 type Test struct {
@@ -43,7 +43,7 @@ var (
 	values = url.Values{
 		"Nest.Children.0.Id": []string{"lol"},
 		"Nest.Children.0.Lol": []string{"lol"},
-		"Map.es_Es": []string{"coooño"},
+		"Map.es_Es": []string{"titanic"},
 		"mierda": []string{"cojonudo"},
 	}
 )
@@ -57,6 +57,7 @@ func BenchmarkAJGForm(b *testing.B) {
 	}
 }
 
+/*
 func BenchmarkSchema(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ne := new(Test)
@@ -66,9 +67,10 @@ func BenchmarkSchema(b *testing.B) {
 		}
 	}
 }
+*/
 
 func BenchmarkFormam(b *testing.B) {
-	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic", strings.NewReader("z=post&both=y"))
+	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_Es=titanic", strings.NewReader("z=post&both=y"))
 	req.Header.Set("Content-Type", "application/x-www-form-encoded; param=value");
 
 	for i := 0; i < b.N; i++ {
@@ -78,6 +80,29 @@ func BenchmarkFormam(b *testing.B) {
 			b.Error(err)
 		}
 		if err := decoder.Decode(); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkJSON(b *testing.B) {
+	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_Es=titanic", strings.NewReader("z=post&both=y"))
+	req.Header.Set("Content-Type", "application/x-www-form-encoded; param=value");
+
+	val := `
+	{
+		"Nest":
+			{
+				"Children": [{"Id": "lol", "Lol":"lol"}]
+			},
+		"Mierda": "cojonudo",
+		"Map": {"es_Es": "titanic"}
+	}
+	`
+
+	for i := 0; i < b.N; i++ {
+		test := new(Test)
+		if err := json.Unmarshal([]byte(val), &test); err != nil {
 			b.Error(err)
 		}
 	}
