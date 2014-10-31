@@ -10,6 +10,10 @@ import (
 	"encoding/json"
 )
 
+type Anony struct {
+	Int int `formam:"int" json:"int"`
+}
+
 type Test struct {
 	Nest struct {
 		Children []struct {
@@ -20,11 +24,28 @@ type Test struct {
 	Mierda string `formam:"mierda" form:"mierda"`
 	Slice  []int
 	Map map[string]string
+	Anony
 }
+
+type Test1 struct {
+	Nest struct {
+		Children []struct {
+			Id string
+			Lol string
+		}
+	}
+	Mierda string `formam:"mierda" form:"mierda"`
+	Slice  []int
+	Map map[string]string
+	Int int `form:"int"`
+	Anony
+}
+
+var urlStr = "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic&Slice[0]=1&Slice[1]=2&int=20"
 
 func TestDecode(t *testing.T) {
 	//req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?main=foo&childs[0]=bar&childs[1]=buz&nest.childs[0].id=lol", strings.NewReader("z=post&both=y"))
-	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic&Slice[0]=1&Slice[1]=2&Slice[2]=2", strings.NewReader("z=post&both=y"))
+	req, _ := http.NewRequest("POST", urlStr, strings.NewReader("z=post&both=y"))
 	req.Header.Set("Content-Type", "application/x-www-form-encoded; param=value");
 	req.ParseForm()
 
@@ -49,12 +70,13 @@ var (
 		"mierda": []string{"cojonudo"},
 		"Slice.0": []string{"1"},
 		"Slice.1": []string{"2"},
+		"int": []string{"1"},
 	}
 )
 
 func BenchmarkAJGForm(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		ne := new(Test)
+		ne := new(Test1)
 		if err := form.DecodeValues(ne, values); err != nil {
 			b.Error(err)
 		}
@@ -74,7 +96,7 @@ func BenchmarkSchema(b *testing.B) {
 */
 
 func BenchmarkFormam(b *testing.B) {
-	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic&Slice[0]=1&Slice[1]=2", strings.NewReader("z=post&both=y"))
+	req, _ := http.NewRequest("POST", urlStr, strings.NewReader("z=post&both=y"))
 	req.Header.Set("Content-Type", "application/x-www-form-encoded; param=value");
 	req.ParseForm()
 	b.ResetTimer()
@@ -99,7 +121,8 @@ func BenchmarkJSON(b *testing.B) {
 			},
 		"Mierda": "cojonudo",
 		"Map": {"es_Es": "titanic"},
-		"Slice": [1, 2]
+		"Slice": [1, 2],
+		"int": 20
 	}
 	`
 	b.ResetTimer()

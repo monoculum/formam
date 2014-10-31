@@ -14,11 +14,11 @@ const TAG_NAME = "formam"
 // A decoder holds the values from form, the 'reflect' value of main struct
 // and the 'reflect' value of current path
 type decoder struct {
-	v   url.Values
+	v    url.Values
 	main reflect.Value
 	curr reflect.Value
 
-	key string
+	key   string
 	value string
 	index int
 }
@@ -46,7 +46,7 @@ func (d *decoder) Decode() error {
 	return nil
 }
 
-// decode is the main function to decode every value at corresponding field
+// decode prepare the path of the current key of map to walk through it
 func (d *decoder) begin() (err error) {
 	d.curr = d.main
 	fields := strings.Split(d.key, ".")
@@ -130,32 +130,40 @@ func (d *decoder) decode() error {
 		//d.curr.MapIndex()
 		d.curr.SetMapIndex(reflect.ValueOf(d.key), reflect.ValueOf(d.value))
 	case reflect.Slice, reflect.Array:
-		len := d.curr.Len()
-		if len <= d.index {
+		if d.curr.Len() <= d.index {
 			sl := reflect.MakeSlice(d.curr.Type(), d.index+1, d.index+1)
 			reflect.Copy(sl, d.curr)
 			d.curr.Set(sl)
 		}
 		d.curr = d.curr.Index(d.index)
-		if err := d.decode(); err == nil {
-
-		}
+		return d.decode()
 	case reflect.String:
 		d.curr.SetString(d.value)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if num, err := strconv.ParseInt(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid number", d.key)
+			return fmt.Errorf("formam: the value \"%v\" should be a valid integer number", d.key)
 		} else {
 			d.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if num, err := strconv.ParseUint(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid number", d.key)
+			return fmt.Errorf("formam: the value \"%v\" should be a valid unsigned number", d.key)
 		} else {
 			d.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
+		if num, err := strconv.ParseFloat(d.value, d.curr.Type().Bits()); err != nil {
+			return fmt.Errorf("formam: the value \"%v\" should be a valid float number", d.key)
+		} else {
+			d.curr.SetFloat(num)
+		}
 	case reflect.Bool:
+		switch d.value {
+		case "true", "True", "1":
+			d.curr.SetBool(true)
+		case "false", "False", "0":
+			d.curr.SetBool(false)
+		}
 	case reflect.Interface:
 	default:
 		return fmt.Errorf("formam: not supported type for field \"%v\"", d.key)
@@ -166,20 +174,25 @@ func (d *decoder) decode() error {
 // findField find a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
 func (d *decoder) findField() error {
-	if v := d.curr.FieldByName(d.key); v.Kind() == reflect.Invalid {
+	if v := d.curr.FieldByName(d.key); !v.IsValid() {
 		num := d.curr.NumField()
-		found := false
 		for i := 0; i < num; i++ {
-			f := d.curr.Type().Field(i).Tag.Get(TAG_NAME)
-			if d.key == f {
+			field := d.curr.Type().Field(i)
+			if field.Anonymous {
+				n := d.curr.FieldByIndex(field.Index)
+				nu := n.NumField()
+				for j := 0; j < nu; j++ {
+					if d.key == n.Type().Field(j).Tag.Get(TAG_NAME) {
+						d.curr = n.Field(j)
+						return nil
+					}
+				}
+			} else if d.key == field.Tag.Get(TAG_NAME) {
 				d.curr = d.curr.Field(i)
-				found = true
-				break
+				return nil
 			}
 		}
-		if !found {
-			return fmt.Errorf("formam: not found the field \"%v\"", d.key)
-		}
+		return fmt.Errorf("formam: not found the field \"%v\"", d.key)
 	} else {
 		d.curr = v
 	}
