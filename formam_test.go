@@ -18,16 +18,18 @@ type Test struct {
 		}
 	}
 	Mierda string `formam:"mierda" form:"mierda"`
+	Slice  []int
 	Map map[string]string
 }
 
 func TestDecode(t *testing.T) {
 	//req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?main=foo&childs[0]=bar&childs[1]=buz&nest.childs[0].id=lol", strings.NewReader("z=post&both=y"))
-	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic", strings.NewReader("z=post&both=y"))
+	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic&Slice[0]=1&Slice[1]=2&Slice[2]=2", strings.NewReader("z=post&both=y"))
 	req.Header.Set("Content-Type", "application/x-www-form-encoded; param=value");
+	req.ParseForm()
 
 	test := &Test{}
-	decoder, err := NewDecoder(req, test)
+	decoder, err := NewDecoder(req.Form, test)
 	if err != nil {
 		t.Error(err)
 	}
@@ -45,6 +47,8 @@ var (
 		"Nest.Children.0.Lol": []string{"lol"},
 		"Map.es_Es": []string{"titanic"},
 		"mierda": []string{"cojonudo"},
+		"Slice.0": []string{"1"},
+		"Slice.1": []string{"2"},
 	}
 )
 
@@ -70,12 +74,13 @@ func BenchmarkSchema(b *testing.B) {
 */
 
 func BenchmarkFormam(b *testing.B) {
-	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_Es=titanic", strings.NewReader("z=post&both=y"))
+	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic&Slice[0]=1&Slice[1]=2", strings.NewReader("z=post&both=y"))
 	req.Header.Set("Content-Type", "application/x-www-form-encoded; param=value");
-
+	req.ParseForm()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		test := new(Test)
-		decoder, err := NewDecoder(req, test)
+		decoder, err := NewDecoder(req.Form, test)
 		if err != nil {
 			b.Error(err)
 		}
@@ -86,9 +91,6 @@ func BenchmarkFormam(b *testing.B) {
 }
 
 func BenchmarkJSON(b *testing.B) {
-	req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_Es=titanic", strings.NewReader("z=post&both=y"))
-	req.Header.Set("Content-Type", "application/x-www-form-encoded; param=value");
-
 	val := `
 	{
 		"Nest":
@@ -96,10 +98,11 @@ func BenchmarkJSON(b *testing.B) {
 				"Children": [{"Id": "lol", "Lol":"lol"}]
 			},
 		"Mierda": "cojonudo",
-		"Map": {"es_Es": "titanic"}
+		"Map": {"es_Es": "titanic"},
+		"Slice": [1, 2]
 	}
 	`
-
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		test := new(Test)
 		if err := json.Unmarshal([]byte(val), &test); err != nil {

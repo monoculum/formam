@@ -1,46 +1,55 @@
 package formam
 
 import (
-	"net/http"
 	"strings"
 	"errors"
 	"reflect"
 	"strconv"
 	"fmt"
+	"net/url"
 )
 
 const TAG_NAME = "formam"
 
+// A decoder holds the values from form, the 'reflect' value of main struct
+// and the 'reflect' value of current path
 type decoder struct {
-	r   *http.Request
-	dst interface {}
-
+	v   url.Values
 	main reflect.Value
 	curr reflect.Value
+
+	key string
+	value string
+	index int
 }
 
-func NewDecoder(r *http.Request, dst interface {}) (*decoder, error) {
-	value := reflect.ValueOf(dst)
-	if value.Kind() != reflect.Ptr {
+// NewDecoder generates a decoder struct with url.Values and struct provided by argument
+func NewDecoder(v url.Values, dst interface {}) (*decoder, error) {
+	main := reflect.ValueOf(dst)
+	if main.Kind() != reflect.Ptr {
 		return nil, errors.New("formam: is not a pointer to struct")
 	}
-	if value.Elem().Kind() != reflect.Struct {
+	if main.Elem().Kind() != reflect.Struct {
 		return nil, errors.New("formam: is not to struct")
 	}
-	return &decoder{r: r, dst: dst, main: value.Elem()}, nil
+	return &decoder{v: v, main: main.Elem()}, nil
 }
 
 func (d *decoder) Decode() error {
-	d.r.ParseForm()
-	for k, v := range d.r.Form {
-		d.decode(k, v[0])
+	for k, v := range d.v {
+		d.key = k
+		d.value = v[0]
+		if err := d.begin(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (d *decoder) decode(key, value string) error {
-	fields := strings.Split(key, ".")
+// decode is the main function to decode every value at corresponding field
+func (d *decoder) begin() (err error) {
 	d.curr = d.main
+	fields := strings.Split(d.key, ".")
 	for i, field := range fields {
 		b := strings.IndexAny(field, "[")
 		if b != -1 {
@@ -49,26 +58,27 @@ func (d *decoder) decode(key, value string) error {
 			if e == -1 {
 				return errors.New("formam: bad syntax array")
 			}
-			name := field[:b]
-			index, err := strconv.Atoi(field[b+1:e])
+			d.key = field[:b]
+			d.index, err = strconv.Atoi(field[b+1:e])
 			if err != nil {
 				return errors.New("formam: the index of array not is a number")
 			}
 			if len(fields) == i+1 {
-				return d.end(name, value, index)
+				return d.end()
 			} else {
-				d.curr, err = d.walk(name, index)
+				d.curr, err = d.walk()
 				if err != nil {
 					return err
 				}
 			}
 		} else {
 			// not is a array
+			d.key = field
+			d.index = -1
 			if len(fields) == i+1 {
-				return d.end(field, value, -1)
+				return d.end()
 			} else {
-				var err error
-				d.curr, err = d.walk(field, -1)
+				d.curr, err = d.walk()
 				if err != nil {
 					return err
 				}
@@ -78,61 +88,100 @@ func (d *decoder) decode(key, value string) error {
 	return nil
 }
 
-func (d *decoder) walk(field string, index int) (reflect.Value, error) {
-	d.findField(field)
-	if index != -1 {
+// walk traverse the path to the final field for set the value
+func (d *decoder) walk() (reflect.Value, error) {
+	if err := d.findField(); err != nil {
+		return d.curr, err
+	}
+	if d.index != -1 {
 		// should be a array...
 		switch d.curr.Kind() {
 		case reflect.Slice, reflect.Array:
 			len := d.curr.Len()
-			if len <= index {
-				len++
+			if len <= d.index {
+				len = len-d.index+1
 				d.curr.Set(reflect.AppendSlice(d.curr, reflect.MakeSlice(d.curr.Type(), len, len)))
 			}
-			d.curr = d.curr.Index(index)
+			d.curr = d.curr.Index(d.index)
 		default:
-			return d.curr, fmt.Errorf("formam: the field \"%v\" not should be a array", field)
+			return d.curr, fmt.Errorf("formam: the field \"%v\" not should be a array", d.key)
 		}
 	}
 	return d.curr, nil
 }
 
-func (d *decoder) end(field, value string, index int) error {
+// end the last field for set its value correspondent
+func (d *decoder) end() error {
 	if d.curr.Kind() == reflect.Struct {
-		d.findField(field)
+		if err := d.findField(); err != nil {
+			return err
+		}
 	}
+	return d.decode()
+}
+
+// decode set the value in its field
+func (d *decoder) decode() error {
 	switch d.curr.Kind() {
 	case reflect.Map:
 		if d.curr.IsNil() {
 			d.curr.Set(reflect.MakeMap(d.curr.Type()))
 		}
-		d.curr.SetMapIndex(reflect.ValueOf(field), reflect.ValueOf(value))
+		//d.curr.MapIndex()
+		d.curr.SetMapIndex(reflect.ValueOf(d.key), reflect.ValueOf(d.value))
 	case reflect.Slice, reflect.Array:
+		len := d.curr.Len()
+		if len <= d.index {
+			sl := reflect.MakeSlice(d.curr.Type(), d.index+1, d.index+1)
+			reflect.Copy(sl, d.curr)
+			d.curr.Set(sl)
+		}
+		d.curr = d.curr.Index(d.index)
+		if err := d.decode(); err == nil {
 
+		}
 	case reflect.String:
-		d.curr.SetString(value)
+		d.curr.SetString(d.value)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if num, err := strconv.ParseInt(d.value, 10, 64); err != nil {
+			return fmt.Errorf("formam: the value \"%v\" should be a valid number", d.key)
+		} else {
+			d.curr.SetInt(num)
+		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		if num, err := strconv.ParseUint(d.value, 10, 64); err != nil {
+			return fmt.Errorf("formam: the value \"%v\" should be a valid number", d.key)
+		} else {
+			d.curr.SetUint(num)
+		}
 	case reflect.Float32, reflect.Float64:
 	case reflect.Bool:
 	case reflect.Interface:
 	default:
-		return fmt.Errorf("formam: not supported type for filed \"%v\"", field)
+		return fmt.Errorf("formam: not supported type for field \"%v\"", d.key)
 	}
 	return nil
 }
 
-func (d *decoder) findField(field string) {
-	if v := d.curr.FieldByName(field); v.Kind() == reflect.Invalid {
+// findField find a field by its name, if it is not found,
+// then retry the search examining the tag "formam" of every field of struct
+func (d *decoder) findField() error {
+	if v := d.curr.FieldByName(d.key); v.Kind() == reflect.Invalid {
 		num := d.curr.NumField()
+		found := false
 		for i := 0; i < num; i++ {
 			f := d.curr.Type().Field(i).Tag.Get(TAG_NAME)
-			if field == f {
+			if d.key == f {
 				d.curr = d.curr.Field(i)
+				found = true
 				break
 			}
+		}
+		if !found {
+			return fmt.Errorf("formam: not found the field \"%v\"", d.key)
 		}
 	} else {
 		d.curr = v
 	}
+	return nil
 }
