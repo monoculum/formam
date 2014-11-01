@@ -50,11 +50,8 @@ func TestDecode(t *testing.T) {
 	req.ParseForm()
 
 	test := &Test{}
-	decoder, err := NewDecoder(req.Form, test)
+	err := Decode(req.Form, test)
 	if err != nil {
-		t.Error(err)
-	}
-	if err := decoder.Decode(); err != nil {
 		t.Error(err)
 	}
 	fmt.Println("FINALIZADO DECODE: ", test)
@@ -102,11 +99,8 @@ func BenchmarkFormam(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		test := new(Test)
-		decoder, err := NewDecoder(req.Form, test)
+		err := Decode(req.Form, test)
 		if err != nil {
-			b.Error(err)
-		}
-		if err := decoder.Decode(); err != nil {
 			b.Error(err)
 		}
 	}

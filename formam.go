@@ -14,7 +14,6 @@ const TAG_NAME = "formam"
 // A decoder holds the values from form, the 'reflect' value of main struct
 // and the 'reflect' value of current path
 type decoder struct {
-	v    url.Values
 	main reflect.Value
 	curr reflect.Value
 
@@ -24,19 +23,13 @@ type decoder struct {
 }
 
 // NewDecoder generates a decoder struct with url.Values and struct provided by argument
-func NewDecoder(v url.Values, dst interface {}) (*decoder, error) {
+func Decode(v url.Values, dst interface {}) error {
 	main := reflect.ValueOf(dst)
-	if main.Kind() != reflect.Ptr {
-		return nil, errors.New("formam: is not a pointer to struct")
+	if main.Kind() != reflect.Ptr || main.Elem().Kind() != reflect.Struct {
+		return errors.New("formam: is not a pointer to struct")
 	}
-	if main.Elem().Kind() != reflect.Struct {
-		return nil, errors.New("formam: is not to struct")
-	}
-	return &decoder{v: v, main: main.Elem()}, nil
-}
-
-func (d *decoder) Decode() error {
-	for k, v := range d.v {
+	d := &decoder{main: main.Elem()}
+	for k, v := range v {
 		d.key = k
 		d.value = v[0]
 		if err := d.begin(); err != nil {
@@ -163,6 +156,8 @@ func (d *decoder) decode() error {
 			d.curr.SetBool(true)
 		case "false", "False", "0":
 			d.curr.SetBool(false)
+		default:
+			return fmt.Errorf("formam: the value \"%v\" is not a valid boolean", d.key)
 		}
 	case reflect.Interface:
 	default:
@@ -174,27 +169,26 @@ func (d *decoder) decode() error {
 // findField find a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
 func (d *decoder) findField() error {
-	if v := d.curr.FieldByName(d.key); !v.IsValid() {
-		num := d.curr.NumField()
-		for i := 0; i < num; i++ {
-			field := d.curr.Type().Field(i)
-			if field.Anonymous {
-				n := d.curr.FieldByIndex(field.Index)
-				nu := n.NumField()
-				for j := 0; j < nu; j++ {
-					if d.key == n.Type().Field(j).Tag.Get(TAG_NAME) {
-						d.curr = n.Field(j)
-						return nil
-					}
-				}
-			} else if d.key == field.Tag.Get(TAG_NAME) {
-				d.curr = d.curr.Field(i)
-				return nil
-			}
+	num := d.curr.NumField()
+	for i := 0; i < num; i++ {
+		field := d.curr.Type().Field(i)
+		if field.Name == d.key {
+			d.curr = d.curr.Field(i)
+			return nil
 		}
-		return fmt.Errorf("formam: not found the field \"%v\"", d.key)
-	} else {
-		d.curr = v
+		if field.Anonymous {
+			n := d.curr.FieldByIndex(field.Index)
+			num = n.NumField()
+			for j := 0; j < num; j++ {
+				if d.key == n.Type().Field(j).Tag.Get(TAG_NAME) {
+					d.curr = n.Field(j)
+					return nil
+				}
+			}
+		} else if d.key == field.Tag.Get(TAG_NAME) {
+			d.curr = d.curr.Field(i)
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("formam: not found the field \"%v\"", d.key)
 }
