@@ -24,6 +24,7 @@ type Test struct {
 	Mierda string `formam:"mierda" form:"mierda"`
 	Slice  []int
 	Map map[string]string
+	Bool bool
 	Anony
 }
 
@@ -38,10 +39,11 @@ type Test1 struct {
 	Slice  []int
 	Map map[string]string
 	Int int `form:"int"`
+	Bool bool
 	Anony
 }
 
-var urlStr = "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic&Slice[0]=1&Slice[1]=2&int=20"
+var urlStr = "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic&Slice[0]=1&Slice[1]=2&int=20&Bool=true"
 
 func TestDecode(t *testing.T) {
 	//req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?main=foo&childs[0]=bar&childs[1]=buz&nest.childs[0].id=lol", strings.NewReader("z=post&both=y"))
@@ -68,6 +70,7 @@ var (
 		"Slice.0": []string{"1"},
 		"Slice.1": []string{"2"},
 		"int": []string{"1"},
+		"Bool": []string{"true"},
 	}
 )
 
@@ -116,7 +119,8 @@ func BenchmarkJSON(b *testing.B) {
 		"Mierda": "cojonudo",
 		"Map": {"es_Es": "titanic"},
 		"Slice": [1, 2],
-		"int": 20
+		"int": 20,
+		"Bool": true
 	}
 	`
 	b.ResetTimer()

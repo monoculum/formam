@@ -134,13 +134,13 @@ func (d *decoder) decode() error {
 		d.curr.SetString(d.value)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if num, err := strconv.ParseInt(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid integer number", d.key)
+			return fmt.Errorf("formam: the value \"%v\" should be a valid signed integer number", d.key)
 		} else {
 			d.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if num, err := strconv.ParseUint(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid unsigned number", d.key)
+			return fmt.Errorf("formam: the value \"%v\" should be a valid unsigned integer number", d.key)
 		} else {
 			d.curr.SetUint(num)
 		}
@@ -152,9 +152,9 @@ func (d *decoder) decode() error {
 		}
 	case reflect.Bool:
 		switch d.value {
-		case "true", "True", "1":
+		case "true", "1":
 			d.curr.SetBool(true)
-		case "false", "False", "0":
+		case "false", "0":
 			d.curr.SetBool(false)
 		default:
 			return fmt.Errorf("formam: the value \"%v\" is not a valid boolean", d.key)
@@ -173,19 +173,15 @@ func (d *decoder) findField() error {
 	for i := 0; i < num; i++ {
 		field := d.curr.Type().Field(i)
 		if field.Name == d.key {
+			// check if the field's name is equal
 			d.curr = d.curr.Field(i)
 			return nil
-		}
-		if field.Anonymous {
-			n := d.curr.FieldByIndex(field.Index)
-			num = n.NumField()
-			for j := 0; j < num; j++ {
-				if d.key == n.Type().Field(j).Tag.Get(TAG_NAME) {
-					d.curr = n.Field(j)
-					return nil
-				}
-			}
+		} else if field.Anonymous {
+			// if the field is anonymous, then iterate over its sub fields
+			d.curr = d.curr.FieldByIndex(field.Index)
+			return d.findField()
 		} else if d.key == field.Tag.Get(TAG_NAME) {
+			// is not found yet, then retry by its tag name "formam"
 			d.curr = d.curr.Field(i)
 			return nil
 		}
