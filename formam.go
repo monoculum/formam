@@ -96,7 +96,7 @@ func (d *decoder) walk() (reflect.Value, error) {
 	return d.curr, nil
 }
 
-// end the last field for set its value correspondent
+// end find the last field for decode/set its value correspondent
 func (d *decoder) end() error {
 	if d.curr.Kind() == reflect.Struct {
 		if err := d.findField(); err != nil {
@@ -113,8 +113,9 @@ func (d *decoder) decode() error {
 		if d.curr.IsNil() {
 			d.curr.Set(reflect.MakeMap(d.curr.Type()))
 		}
-		//d.curr.MapIndex()
-		d.curr.SetMapIndex(reflect.ValueOf(d.field), reflect.ValueOf(d.value))
+		k := newValue(d.curr.Type().Key(), d.field).Convert(d.curr.Type().Key())
+		v := newValue(d.curr.Type().Elem(), d.value).Convert(d.curr.Type().Elem())
+		d.curr.SetMapIndex(k, v)
 	case reflect.Slice, reflect.Array:
 		if d.curr.Len() <= d.index {
 			d.expandSlice()
@@ -158,6 +159,34 @@ func (d *decoder) decode() error {
 	return nil
 }
 
+func newValue(typ reflect.Type, value string) reflect.Value {
+	switch typ.Kind() {
+	case reflect.Map:
+		
+	case reflect.String:
+		return reflect.ValueOf(value)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if num, err := strconv.ParseInt(value, 10, 64); err != nil {
+			return reflect.Zero(typ)
+		} else {
+			return reflect.ValueOf(num)
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		if num, err := strconv.ParseUint(value, 10, 64); err != nil {
+			return reflect.Zero(typ)
+		} else {
+			return reflect.ValueOf(num)
+		}
+	case reflect.Float32, reflect.Float64:
+		if num, err := strconv.ParseFloat(value, typ.Bits()); err != nil {
+			return reflect.Zero(typ)
+		} else {
+			return reflect.ValueOf(num)
+		}
+	}
+	return reflect.Zero(typ)
+}
+
 // findField find a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
 func (d *decoder) findField() error {
@@ -169,7 +198,7 @@ func (d *decoder) findField() error {
 			d.curr = d.curr.Field(i)
 			return nil
 		} else if field.Anonymous {
-			// if the field is anonymous, then iterate over its sub fields
+			// if the field is a anonymous struct, then iterate over its fields
 			d.curr = d.curr.FieldByIndex(field.Index)
 			return d.findField()
 		} else if d.field == field.Tag.Get(TAG_NAME) {

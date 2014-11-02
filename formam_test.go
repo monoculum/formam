@@ -23,7 +23,7 @@ type Test struct {
 	}
 	Mierda string `formam:"mierda" form:"mierda"`
 	Slice  []int
-	Map map[string]string
+	Map map[string]int8
 	Bool bool
 	Anony
 }
@@ -37,16 +37,15 @@ type Test1 struct {
 	}
 	Mierda string `formam:"mierda" form:"mierda"`
 	Slice  []int
-	Map map[string]string
+	Map map[string]int8
 	Int int `form:"int"`
 	Bool bool
 	Anony
 }
 
-var urlStr = "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=titanic&Slice[0]=1&Slice[1]=2&int=20&Bool=true"
+var urlStr = "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=2&Slice[0]=1&Slice[1]=2&int=20&Bool=true"
 
 func TestDecode(t *testing.T) {
-	//req, _ := http.NewRequest("POST", "http://www.monoculum.com/search?main=foo&childs[0]=bar&childs[1]=buz&nest.childs[0].id=lol", strings.NewReader("z=post&both=y"))
 	req, _ := http.NewRequest("POST", urlStr, strings.NewReader("z=post&both=y"))
 	req.Header.Set("Content-Type", "application/x-www-form-encoded; param=value");
 	req.ParseForm()
@@ -65,7 +64,7 @@ var (
 	values = url.Values{
 		"Nest.Children.0.Id": []string{"lol"},
 		"Nest.Children.0.Lol": []string{"lol"},
-		"Map.es_Es": []string{"titanic"},
+		"Map.es_Es": []string{"2"},
 		"mierda": []string{"cojonudo"},
 		"Slice.0": []string{"1"},
 		"Slice.1": []string{"2"},
@@ -102,8 +101,7 @@ func BenchmarkFormam(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		test := new(Test)
-		err := Decode(req.Form, test)
-		if err != nil {
+		if err := Decode(req.Form, test); err != nil {
 			b.Error(err)
 		}
 	}
@@ -117,7 +115,7 @@ func BenchmarkJSON(b *testing.B) {
 				"Children": [{"Id": "lol", "Lol":"lol"}]
 			},
 		"Mierda": "cojonudo",
-		"Map": {"es_Es": "titanic"},
+		"Map": {"es_Es": 2},
 		"Slice": [1, 2],
 		"int": 20,
 		"Bool": true
