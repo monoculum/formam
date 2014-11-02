@@ -17,7 +17,7 @@ type decoder struct {
 	main reflect.Value
 	curr reflect.Value
 
-	key   string
+	field string
 	value string
 	index int
 }
@@ -30,7 +30,7 @@ func Decode(v url.Values, dst interface {}) error {
 	}
 	d := &decoder{main: main.Elem()}
 	for k, v := range v {
-		d.key = k
+		d.field = k
 		d.value = v[0]
 		if err := d.begin(); err != nil {
 			return err
@@ -42,7 +42,7 @@ func Decode(v url.Values, dst interface {}) error {
 // decode prepare the path of the current key of map to walk through it
 func (d *decoder) begin() (err error) {
 	d.curr = d.main
-	fields := strings.Split(d.key, ".")
+	fields := strings.Split(d.field, ".")
 	for i, field := range fields {
 		b := strings.IndexAny(field, "[")
 		if b != -1 {
@@ -51,34 +51,29 @@ func (d *decoder) begin() (err error) {
 			if e == -1 {
 				return errors.New("formam: bad syntax array")
 			}
-			d.key = field[:b]
-			d.index, err = strconv.Atoi(field[b+1:e])
-			if err != nil {
+			d.field = field[:b]
+			if d.index, err = strconv.Atoi(field[b+1:e]); err != nil {
 				return errors.New("formam: the index of array not is a number")
 			}
 			if len(fields) == i+1 {
 				return d.end()
-			} else {
-				d.curr, err = d.walk()
-				if err != nil {
-					return err
-				}
+			}
+			if d.curr, err = d.walk(); err != nil {
+				return
 			}
 		} else {
 			// not is a array
-			d.key = field
+			d.field = field
 			d.index = -1
 			if len(fields) == i+1 {
 				return d.end()
-			} else {
-				d.curr, err = d.walk()
-				if err != nil {
-					return err
-				}
+			}
+			if d.curr, err = d.walk(); err != nil {
+				return
 			}
 		}
 	}
-	return nil
+	return
 }
 
 // walk traverse the path to the final field for set the value
@@ -90,14 +85,12 @@ func (d *decoder) walk() (reflect.Value, error) {
 		// should be a array...
 		switch d.curr.Kind() {
 		case reflect.Slice, reflect.Array:
-			len := d.curr.Len()
-			if len <= d.index {
-				len = len-d.index+1
-				d.curr.Set(reflect.AppendSlice(d.curr, reflect.MakeSlice(d.curr.Type(), len, len)))
+			if d.curr.Len() <= d.index {
+				d.expandSlice()
 			}
 			d.curr = d.curr.Index(d.index)
 		default:
-			return d.curr, fmt.Errorf("formam: the field \"%v\" not should be a array", d.key)
+			return d.curr, fmt.Errorf("formam: the field \"%v\" not should be a array", d.field)
 		}
 	}
 	return d.curr, nil
@@ -121,12 +114,10 @@ func (d *decoder) decode() error {
 			d.curr.Set(reflect.MakeMap(d.curr.Type()))
 		}
 		//d.curr.MapIndex()
-		d.curr.SetMapIndex(reflect.ValueOf(d.key), reflect.ValueOf(d.value))
+		d.curr.SetMapIndex(reflect.ValueOf(d.field), reflect.ValueOf(d.value))
 	case reflect.Slice, reflect.Array:
 		if d.curr.Len() <= d.index {
-			sl := reflect.MakeSlice(d.curr.Type(), d.index+1, d.index+1)
-			reflect.Copy(sl, d.curr)
-			d.curr.Set(sl)
+			d.expandSlice()
 		}
 		d.curr = d.curr.Index(d.index)
 		return d.decode()
@@ -134,19 +125,19 @@ func (d *decoder) decode() error {
 		d.curr.SetString(d.value)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if num, err := strconv.ParseInt(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid signed integer number", d.key)
+			return fmt.Errorf("formam: the value \"%v\" should be a valid signed integer number", d.field)
 		} else {
 			d.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if num, err := strconv.ParseUint(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid unsigned integer number", d.key)
+			return fmt.Errorf("formam: the value \"%v\" should be a valid unsigned integer number", d.field)
 		} else {
 			d.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
 		if num, err := strconv.ParseFloat(d.value, d.curr.Type().Bits()); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid float number", d.key)
+			return fmt.Errorf("formam: the value \"%v\" should be a valid float number", d.field)
 		} else {
 			d.curr.SetFloat(num)
 		}
@@ -157,11 +148,12 @@ func (d *decoder) decode() error {
 		case "false", "0":
 			d.curr.SetBool(false)
 		default:
-			return fmt.Errorf("formam: the value \"%v\" is not a valid boolean", d.key)
+			return fmt.Errorf("formam: the value \"%v\" is not a valid boolean", d.field)
 		}
 	case reflect.Interface:
+		d.curr.Set(reflect.ValueOf(d.value))
 	default:
-		return fmt.Errorf("formam: not supported type for field \"%v\"", d.key)
+		return fmt.Errorf("formam: not supported type for field \"%v\"", d.field)
 	}
 	return nil
 }
@@ -172,7 +164,7 @@ func (d *decoder) findField() error {
 	num := d.curr.NumField()
 	for i := 0; i < num; i++ {
 		field := d.curr.Type().Field(i)
-		if field.Name == d.key {
+		if field.Name == d.field {
 			// check if the field's name is equal
 			d.curr = d.curr.Field(i)
 			return nil
@@ -180,11 +172,18 @@ func (d *decoder) findField() error {
 			// if the field is anonymous, then iterate over its sub fields
 			d.curr = d.curr.FieldByIndex(field.Index)
 			return d.findField()
-		} else if d.key == field.Tag.Get(TAG_NAME) {
+		} else if d.field == field.Tag.Get(TAG_NAME) {
 			// is not found yet, then retry by its tag name "formam"
 			d.curr = d.curr.Field(i)
 			return nil
 		}
 	}
-	return fmt.Errorf("formam: not found the field \"%v\"", d.key)
+	return fmt.Errorf("formam: not found the field \"%v\"", d.field)
+}
+
+// expandSlice expand the length and capacity of the current slice
+func (d *decoder) expandSlice() {
+	sli := reflect.MakeSlice(d.curr.Type(), d.index+1, d.index+1)
+	reflect.Copy(sli, d.curr)
+	d.curr.Set(sli)
 }
