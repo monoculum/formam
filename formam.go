@@ -14,6 +14,8 @@ const TAG_NAME = "formam"
 // A decoder holds the values from form, the 'reflect' value of main struct
 // and the 'reflect' value of current path
 type decoder struct {
+	values url.Values
+
 	main reflect.Value
 	curr reflect.Value
 
@@ -28,7 +30,7 @@ func Decode(v url.Values, dst interface {}) error {
 	if main.Kind() != reflect.Ptr || main.Elem().Kind() != reflect.Struct {
 		return errors.New("formam: is not a pointer to struct")
 	}
-	d := &decoder{main: main.Elem()}
+	d := &decoder{main: main.Elem(), values: v}
 	for k, v := range v {
 		d.field = k
 		d.value = v[0]
@@ -110,12 +112,32 @@ func (d *decoder) end() error {
 func (d *decoder) decode() error {
 	switch d.curr.Kind() {
 	case reflect.Map:
+		typ := d.curr.Type()
 		if d.curr.IsNil() {
-			d.curr.Set(reflect.MakeMap(d.curr.Type()))
+			d.curr.Set(reflect.MakeMap(typ))
 		}
-		k := newValue(d.curr.Type().Key(), d.field).Convert(d.curr.Type().Key())
-		v := newValue(d.curr.Type().Elem(), d.value).Convert(d.curr.Type().Elem())
-		d.curr.SetMapIndex(k, v)
+		main := d.curr
+		value := d.value
+		key := reflect.New(typ.Key()).Elem()
+		d.curr = key
+		d.value = d.field
+		if err := d.decode(); err != nil {
+			return err
+		}
+		var curr reflect.Value
+		if k := main.MapIndex(key); k.IsValid() {
+			curr = reflect.New(k.Type()).Elem()
+			curr.Set(k)
+		} else {
+			typeV := typ.Elem()
+			curr = reflect.New(typeV).Elem()
+		}
+		d.curr = curr
+		d.value = value
+		if err := d.decode(); err != nil {
+			return err
+		}
+		main.SetMapIndex(key, curr)
 	case reflect.Slice, reflect.Array:
 		if d.curr.Len() <= d.index {
 			d.expandSlice()
@@ -159,34 +181,6 @@ func (d *decoder) decode() error {
 	return nil
 }
 
-func newValue(typ reflect.Type, value string) reflect.Value {
-	switch typ.Kind() {
-	case reflect.Map:
-		
-	case reflect.String:
-		return reflect.ValueOf(value)
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if num, err := strconv.ParseInt(value, 10, 64); err != nil {
-			return reflect.Zero(typ)
-		} else {
-			return reflect.ValueOf(num)
-		}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		if num, err := strconv.ParseUint(value, 10, 64); err != nil {
-			return reflect.Zero(typ)
-		} else {
-			return reflect.ValueOf(num)
-		}
-	case reflect.Float32, reflect.Float64:
-		if num, err := strconv.ParseFloat(value, typ.Bits()); err != nil {
-			return reflect.Zero(typ)
-		} else {
-			return reflect.ValueOf(num)
-		}
-	}
-	return reflect.Zero(typ)
-}
-
 // findField find a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
 func (d *decoder) findField() error {
@@ -215,4 +209,10 @@ func (d *decoder) expandSlice() {
 	sli := reflect.MakeSlice(d.curr.Type(), d.index+1, d.index+1)
 	reflect.Copy(sli, d.curr)
 	d.curr.Set(sli)
+}
+
+func expandSlice(curr reflect.Value, index int) {
+	sli := reflect.MakeSlice(curr.Type(), index+1, index+1)
+	reflect.Copy(sli, curr)
+	curr.Set(sli)
 }

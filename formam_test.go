@@ -23,7 +23,7 @@ type Test struct {
 	}
 	Mierda string `formam:"mierda" form:"mierda"`
 	Slice  []int
-	Map map[string]int8
+	Map map[string][]string
 	Bool bool
 	Anony
 }
@@ -37,13 +37,13 @@ type Test1 struct {
 	}
 	Mierda string `formam:"mierda" form:"mierda"`
 	Slice  []int
-	Map map[string]int8
+	Map map[string][]string
 	Int int `form:"int"`
 	Bool bool
 	Anony
 }
 
-var urlStr = "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es=2&Slice[0]=1&Slice[1]=2&int=20&Bool=true"
+var urlStr = "http://www.monoculum.com/search?Nest.Children[0].Id=lol&Nest.Children[0].Lol=lol&mierda=cojonudo&Map.es_es[0]=javier&Map.es_es[1]=emilio&Slice[0]=1&Slice[1]=2&int=20&Bool=true"
 
 func TestDecode(t *testing.T) {
 	req, _ := http.NewRequest("POST", urlStr, strings.NewReader("z=post&both=y"))
@@ -64,7 +64,8 @@ var (
 	values = url.Values{
 		"Nest.Children.0.Id": []string{"lol"},
 		"Nest.Children.0.Lol": []string{"lol"},
-		"Map.es_Es": []string{"2"},
+		"Map.es_Es.0": []string{"javier"},
+		"Map.es_Es.1": []string{"emilio"},
 		"mierda": []string{"cojonudo"},
 		"Slice.0": []string{"1"},
 		"Slice.1": []string{"2"},
@@ -115,7 +116,7 @@ func BenchmarkJSON(b *testing.B) {
 				"Children": [{"Id": "lol", "Lol":"lol"}]
 			},
 		"Mierda": "cojonudo",
-		"Map": {"es_Es": 2},
+		"Map": {"es_Es": ["javier", "emilio"]},
 		"Slice": [1, 2],
 		"int": 20,
 		"Bool": true
