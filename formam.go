@@ -13,11 +13,18 @@ const TAG_NAME = "formam"
 
 // A decoder holds the values from form, the 'reflect' value of main struct
 // and the 'reflect' value of current path
-type decoder struct {
-	values url.Values
+type pathMap struct {
+	m reflect.Value
 
+	key string
+	value reflect.Value
+}
+
+type decoder struct {
 	main reflect.Value
 	curr reflect.Value
+
+	maps []pathMap
 
 	field string
 	value string
@@ -30,7 +37,7 @@ func Decode(v url.Values, dst interface {}) error {
 	if main.Kind() != reflect.Ptr || main.Elem().Kind() != reflect.Struct {
 		return errors.New("formam: is not a pointer to struct")
 	}
-	d := &decoder{main: main.Elem(), values: v}
+	d := &decoder{main: main.Elem()}
 	for k, v := range v {
 		d.field = k
 		d.value = v[0]
@@ -80,8 +87,20 @@ func (d *decoder) begin() (err error) {
 
 // walk traverse the path to the final field for set the value
 func (d *decoder) walk() (reflect.Value, error) {
-	if err := d.findField(); err != nil {
-		return d.curr, err
+	switch d.curr.Kind() {
+	case reflect.Struct:
+		if err := d.findField(); err != nil {
+			return d.curr, err
+		}
+	case reflect.Map:
+		fmt.Println("lol")
+		typ := d.curr.Type()
+		if d.curr.IsNil() {
+			d.curr.Set(reflect.MakeMap(typ))
+		}
+		v := reflect.New(typ.Elem()).Elem()
+		d.maps = append(d.maps, pathMap{d.curr, d.field, v})
+		d.curr = v
 	}
 	if d.index != -1 {
 		// should be a array...
@@ -105,7 +124,16 @@ func (d *decoder) end() error {
 			return err
 		}
 	}
-	return d.decode()
+	d.decode()
+	if len(d.maps) > 0 {
+		for _, v := range d.maps {
+			k := reflect.New(v.m.Type().Key()).Elem()
+			k.SetString(v.key)
+			v.m.SetMapIndex(k, v.value)
+		}
+		d.maps = []pathMap{}
+	}
+	return nil
 }
 
 // decode set the value in its field
@@ -209,10 +237,4 @@ func (d *decoder) expandSlice() {
 	sli := reflect.MakeSlice(d.curr.Type(), d.index+1, d.index+1)
 	reflect.Copy(sli, d.curr)
 	d.curr.Set(sli)
-}
-
-func expandSlice(curr reflect.Value, index int) {
-	sli := reflect.MakeSlice(curr.Type(), index+1, index+1)
-	reflect.Copy(sli, curr)
-	curr.Set(sli)
 }
