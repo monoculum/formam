@@ -20,11 +20,30 @@ type pathMap struct {
 	value reflect.Value
 }
 
+type pathMaps []*pathMap
+
+func (ma pathMaps) find(id reflect.Value) *pathMap {
+	for _, v := range ma {
+		if v.m == id {
+			return v
+		}
+	}
+	return nil
+}
+
+type pathSlice struct {
+	m reflect.Value
+	value reflect.Value
+}
+
+type pathSlices []*pathSlice
+
 type decoder struct {
 	main reflect.Value
 	curr reflect.Value
 
-	maps []pathMap
+	maps   pathMaps
+	slices pathSlices
 
 	field string
 	value string
@@ -44,6 +63,14 @@ func Decode(v url.Values, dst interface {}) error {
 		if err := d.begin(); err != nil {
 			return err
 		}
+	}
+	if len(d.maps) > 0 {
+		for _, v := range d.maps {
+			k := reflect.New(v.m.Type().Key()).Elem()
+			k.SetString(v.key)
+			v.m.SetMapIndex(k, v.value)
+		}
+		//d.maps = []*pathMap{}
 	}
 	return nil
 }
@@ -93,14 +120,21 @@ func (d *decoder) walk() (reflect.Value, error) {
 			return d.curr, err
 		}
 	case reflect.Map:
-		fmt.Println("lol")
 		typ := d.curr.Type()
 		if d.curr.IsNil() {
 			d.curr.Set(reflect.MakeMap(typ))
+			v := reflect.New(typ.Elem()).Elem()
+			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
+			d.curr = v
+		} else {
+			a := d.maps.find(d.curr)
+			if a == nil {
+				v := reflect.New(typ.Elem()).Elem()
+				d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
+			} else {
+				d.curr = a.value
+			}
 		}
-		v := reflect.New(typ.Elem()).Elem()
-		d.maps = append(d.maps, pathMap{d.curr, d.field, v})
-		d.curr = v
 	}
 	if d.index != -1 {
 		// should be a array...
@@ -124,16 +158,7 @@ func (d *decoder) end() error {
 			return err
 		}
 	}
-	d.decode()
-	if len(d.maps) > 0 {
-		for _, v := range d.maps {
-			k := reflect.New(v.m.Type().Key()).Elem()
-			k.SetString(v.key)
-			v.m.SetMapIndex(k, v.value)
-		}
-		d.maps = []pathMap{}
-	}
-	return nil
+	return d.decode()
 }
 
 // decode set the value in its field
