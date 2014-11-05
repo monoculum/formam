@@ -22,9 +22,9 @@ type pathMap struct {
 
 type pathMaps []*pathMap
 
-func (ma pathMaps) find(id reflect.Value) *pathMap {
+func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
 	for _, v := range ma {
-		if v.m == id {
+		if v.m == id && v.key == key {
 			return v
 		}
 	}
@@ -126,7 +126,7 @@ func (d *decoder) walk() (reflect.Value, error) {
 			v := reflect.New(typ.Elem()).Elem()
 			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
 			d.curr = v
-		} else if a := d.maps.find(d.curr); a == nil {
+		} else if a := d.maps.find(d.curr, d.field); a == nil {
 			v := reflect.New(typ.Elem()).Elem()
 			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
 		} else {
@@ -168,9 +168,10 @@ func (d *decoder) decode() error {
 			v := reflect.New(typ.Elem()).Elem()
 			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
 			d.curr = v
-		} else if a := d.maps.find(d.curr); a == nil {
+		} else if a := d.maps.find(d.curr, d.field); a == nil {
 			v := reflect.New(typ.Elem()).Elem()
 			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
+			d.curr = v
 		} else {
 			d.curr = a.value
 		}

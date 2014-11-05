@@ -126,7 +126,7 @@ func BenchmarkJSON(b *testing.B) {
 				"Children": [{"Id": "lol", "Lol":"lol"}]
 			},
 		"Mierda": "cojonudo",
-		"Map": {"es_Es": ["emilio", "javier", "ronaldo", "waldo", "javier", "cinco"]},
+		"Map": {"es_Es": ["javier", "javier", "javier", "javier", "javier", "javier"]},
 		"Slice": [1, 2],
 		"int": 20,
 		"Bool": true
