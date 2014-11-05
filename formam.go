@@ -50,12 +50,6 @@ type decoder struct {
 	index int
 }
 
-type StringSlice []string
-
-func (p StringSlice) Len() int           { return len(p) }
-func (p StringSlice) Less(i, j int) bool { return p[i] > p[j] }
-func (p StringSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
 // NewDecoder generates a decoder struct with url.Values and struct provided by argument
 func Decode(vv url.Values, dst interface {}) error {
 	main := reflect.ValueOf(dst)
@@ -76,7 +70,7 @@ func Decode(vv url.Values, dst interface {}) error {
 			k.SetString(v.key)
 			v.m.SetMapIndex(k, v.value)
 		}
-		//d.maps = []*pathMap{}
+		d.maps = []*pathMap{}
 	}
 	return nil
 }
