@@ -32,7 +32,7 @@ func (ma pathMaps) find(id reflect.Value) *pathMap {
 }
 
 type pathSlice struct {
-	m reflect.Value
+	m     reflect.Value
 	value reflect.Value
 }
 
@@ -50,14 +50,20 @@ type decoder struct {
 	index int
 }
 
+type StringSlice []string
+
+func (p StringSlice) Len() int           { return len(p) }
+func (p StringSlice) Less(i, j int) bool { return p[i] > p[j] }
+func (p StringSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
 // NewDecoder generates a decoder struct with url.Values and struct provided by argument
-func Decode(v url.Values, dst interface {}) error {
+func Decode(vv url.Values, dst interface {}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr || main.Elem().Kind() != reflect.Struct {
 		return errors.New("formam: is not a pointer to struct")
 	}
 	d := &decoder{main: main.Elem()}
-	for k, v := range v {
+	for k, v := range vv {
 		d.field = k
 		d.value = v[0]
 		if err := d.begin(); err != nil {
@@ -126,14 +132,11 @@ func (d *decoder) walk() (reflect.Value, error) {
 			v := reflect.New(typ.Elem()).Elem()
 			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
 			d.curr = v
+		} else if a := d.maps.find(d.curr); a == nil {
+			v := reflect.New(typ.Elem()).Elem()
+			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
 		} else {
-			a := d.maps.find(d.curr)
-			if a == nil {
-				v := reflect.New(typ.Elem()).Elem()
-				d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
-			} else {
-				d.curr = a.value
-			}
+			d.curr = a.value
 		}
 	}
 	if d.index != -1 {
@@ -168,29 +171,16 @@ func (d *decoder) decode() error {
 		typ := d.curr.Type()
 		if d.curr.IsNil() {
 			d.curr.Set(reflect.MakeMap(typ))
-		}
-		main := d.curr
-		value := d.value
-		key := reflect.New(typ.Key()).Elem()
-		d.curr = key
-		d.value = d.field
-		if err := d.decode(); err != nil {
-			return err
-		}
-		var curr reflect.Value
-		if k := main.MapIndex(key); k.IsValid() {
-			curr = reflect.New(k.Type()).Elem()
-			curr.Set(k)
+			v := reflect.New(typ.Elem()).Elem()
+			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
+			d.curr = v
+		} else if a := d.maps.find(d.curr); a == nil {
+			v := reflect.New(typ.Elem()).Elem()
+			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
 		} else {
-			typeV := typ.Elem()
-			curr = reflect.New(typeV).Elem()
+			d.curr = a.value
 		}
-		d.curr = curr
-		d.value = value
-		if err := d.decode(); err != nil {
-			return err
-		}
-		main.SetMapIndex(key, curr)
+		return d.decode()
 	case reflect.Slice, reflect.Array:
 		if d.curr.Len() <= d.index {
 			d.expandSlice()
