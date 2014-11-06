@@ -129,7 +129,7 @@ func (d *decoder) walk() (reflect.Value, error) {
 			}
 			d.curr = d.curr.Index(d.index)
 		default:
-			return d.curr, fmt.Errorf("formam: the field \"%v\" not should be a array", d.field)
+			return d.curr, fmt.Errorf("formam: the field \"%v\" has a index for array but it is not", d.field)
 		}
 	}
 	return d.curr, nil
