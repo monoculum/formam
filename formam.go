@@ -142,6 +142,9 @@ func (d *decoder) end() error {
 			return err
 		}
 	}
+	if d.value == "" {
+		return nil
+	}
 	return d.decode()
 }
 
