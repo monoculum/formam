@@ -1,12 +1,12 @@
 package formam
 
 import (
-	"strings"
 	"errors"
-	"reflect"
-	"strconv"
 	"fmt"
 	"net/url"
+	"reflect"
+	"strconv"
+	"strings"
 )
 
 const TAG_NAME = "formam"
@@ -16,7 +16,7 @@ const TAG_NAME = "formam"
 type pathMap struct {
 	m reflect.Value
 
-	key string
+	key   string
 	value reflect.Value
 }
 
@@ -35,7 +35,7 @@ type decoder struct {
 	main reflect.Value
 	curr reflect.Value
 
-	maps   pathMaps
+	maps pathMaps
 
 	field string
 	value string
@@ -43,7 +43,7 @@ type decoder struct {
 }
 
 // NewDecoder generates a decoder struct with url.Values and struct provided by argument
-func Decode(vv url.Values, dst interface {}) error {
+func Decode(vv url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr || main.Elem().Kind() != reflect.Struct {
 		return errors.New("formam: is not a pointer to struct")
@@ -82,7 +82,7 @@ func (d *decoder) begin() (err error) {
 				return errors.New("formam: bad syntax array")
 			}
 			d.field = field[:b]
-			if d.index, err = strconv.Atoi(field[b+1:e]); err != nil {
+			if d.index, err = strconv.Atoi(field[b+1 : e]); err != nil {
 				return errors.New("formam: the index of array not is a number")
 			}
 			if len(fields) == i+1 {
