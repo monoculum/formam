@@ -179,7 +179,7 @@ func (d *decoder) decode() error {
 		}
 	case reflect.Bool:
 		switch d.value {
-		case "true", "1":
+		case "true", "on", "1":
 			d.curr.SetBool(true)
 		case "false", "0":
 			d.curr.SetBool(false)
