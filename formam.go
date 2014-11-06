@@ -31,19 +31,11 @@ func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
 	return nil
 }
 
-type pathSlice struct {
-	m     reflect.Value
-	value reflect.Value
-}
-
-type pathSlices []*pathSlice
-
 type decoder struct {
 	main reflect.Value
 	curr reflect.Value
 
 	maps   pathMaps
-	slices pathSlices
 
 	field string
 	value string
@@ -64,14 +56,16 @@ func Decode(vv url.Values, dst interface {}) error {
 			return err
 		}
 	}
-	if len(d.maps) > 0 {
-		for _, v := range d.maps {
-			k := reflect.New(v.m.Type().Key()).Elem()
-			k.SetString(v.key)
-			v.m.SetMapIndex(k, v.value)
+	for _, v := range d.maps {
+		k := reflect.New(v.m.Type().Key()).Elem()
+		d.curr = k
+		d.value = v.key
+		if err := d.decode(); err != nil {
+			return err
 		}
-		d.maps = []*pathMap{}
+		v.m.SetMapIndex(d.curr, v.value)
 	}
+	d.maps = []*pathMap{}
 	return nil
 }
 
@@ -120,18 +114,11 @@ func (d *decoder) walk() (reflect.Value, error) {
 			return d.curr, err
 		}
 	case reflect.Map:
-		typ := d.curr.Type()
-		if d.curr.IsNil() {
-			d.curr.Set(reflect.MakeMap(typ))
-			v := reflect.New(typ.Elem()).Elem()
-			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
-			d.curr = v
-		} else if a := d.maps.find(d.curr, d.field); a == nil {
-			v := reflect.New(typ.Elem()).Elem()
-			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
-		} else {
-			d.curr = a.value
-		}
+		d.currentMap()
+	case reflect.Ptr:
+		d.curr.Set(reflect.New(d.curr.Type().Elem()))
+		d.curr = d.curr.Elem()
+		return d.walk()
 	}
 	if d.index != -1 {
 		// should be a array...
@@ -162,19 +149,7 @@ func (d *decoder) end() error {
 func (d *decoder) decode() error {
 	switch d.curr.Kind() {
 	case reflect.Map:
-		typ := d.curr.Type()
-		if d.curr.IsNil() {
-			d.curr.Set(reflect.MakeMap(typ))
-			v := reflect.New(typ.Elem()).Elem()
-			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
-			d.curr = v
-		} else if a := d.maps.find(d.curr, d.field); a == nil {
-			v := reflect.New(typ.Elem()).Elem()
-			d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
-			d.curr = v
-		} else {
-			d.curr = a.value
-		}
+		d.currentMap()
 		return d.decode()
 	case reflect.Slice, reflect.Array:
 		if d.curr.Len() <= d.index {
@@ -213,6 +188,10 @@ func (d *decoder) decode() error {
 		}
 	case reflect.Interface:
 		d.curr.Set(reflect.ValueOf(d.value))
+	case reflect.Ptr:
+		d.curr.Set(reflect.New(d.curr.Type().Elem()))
+		d.curr = d.curr.Elem()
+		return d.decode()
 	default:
 		return fmt.Errorf("formam: not supported type for field \"%v\"", d.field)
 	}
@@ -247,4 +226,21 @@ func (d *decoder) expandSlice() {
 	sli := reflect.MakeSlice(d.curr.Type(), d.index+1, d.index+1)
 	reflect.Copy(sli, d.curr)
 	d.curr.Set(sli)
+}
+
+// currentMap get in d.curr the map concrete for decode the current value
+func (d *decoder) currentMap() {
+	typ := d.curr.Type()
+	if d.curr.IsNil() {
+		d.curr.Set(reflect.MakeMap(typ))
+		v := reflect.New(typ.Elem()).Elem()
+		d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
+		d.curr = v
+	} else if a := d.maps.find(d.curr, d.field); a == nil {
+		v := reflect.New(typ.Elem()).Elem()
+		d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
+		d.curr = v
+	} else {
+		d.curr = a.value
+	}
 }
