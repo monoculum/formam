@@ -19,7 +19,11 @@ type Test struct {
 	}
 	String string
 	Slice  []int
-	Map map[string][]string
+	MapSlice map[string][]string
+	MapMap map[string]map[string]string
+	MapMapMapStruct map[string]map[string]map[string]map[string]struct{
+		Recursive bool
+	}
 	Bool bool
 	Ptr  *string
 	Tag  string `formam:"tag"`
@@ -29,18 +33,22 @@ type Test struct {
 var valuesFormam = url.Values{
 	"Nest.Children[0].Id": []string{"monoculum_id"},
 	"Nest.Children[0].Name": []string{"Monoculum"},
-	"Map.es_Es[0]": []string{"javier"},
-	"Map.es_Es[1]": []string{"javier"},
-	"Map.es_Es[2]": []string{"javier"},
-	"Map.es_Es[3]": []string{"javier"},
-	"Map.es_Es[4]": []string{"javier"},
-	"Map.es_Es[5]": []string{"javier"},
-	"String": []string{"cojonudo"},
+	"MapSlice.names[0]": []string{"shinji"},
+	"MapSlice.names[2]": []string{"sasuka"},
+	"MapSlice.names[4]": []string{"carla"},
+	"MapSlice.countries[0]": []string{"japan"},
+	"MapSlice.countries[1]": []string{"spain"},
+	"MapSlice.countries[2]": []string{"germany"},
+	"MapSlice.countries[3]": []string{"united states"},
+	"MapMap.titles.es_es": []string{"El viaje de Chihiro"},
+	"MapMap.titles.en_us": []string{"The spirit away"},
+	"MapMapMapStruct.map.struct.are.recursive.Recursive": []string{"true"},
 	"Slice[0]": []string{"1"},
 	"Slice[1]": []string{"2"},
-	"int": []string{"1"},
+	"int": []string{"1"}, // Int is located inside Anonymous struct
 	"Bool": []string{"true"},
 	"tag": []string{"tagged"},
+	"Ptr": []string{"this is a pointer to string"},
 }
 
 
