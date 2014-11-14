@@ -47,13 +47,13 @@ type decoder struct {
 }
 
 // Decode decode the url.Values into struct provided by argument
-func Decode(vv url.Values, dst interface{}) error {
+func Decode(vs url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr || main.Elem().Kind() != reflect.Struct {
 		return errors.New("formam: is not a pointer to struct")
 	}
 	d := &decoder{main: main.Elem()}
-	for k, v := range vv {
+	for k, v := range vs {
 		d.field = k
 		d.value = v[0]
 		if err := d.begin(); err != nil {
@@ -67,7 +67,7 @@ func Decode(vv url.Values, dst interface{}) error {
 	return nil
 }
 
-// decode prepare the current path to walk through it
+// begin prepare the current path to walk through it
 func (d *decoder) begin() (err error) {
 	d.curr = d.main
 	fields := strings.Split(d.field, ".")
