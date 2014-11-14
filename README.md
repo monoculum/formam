@@ -30,6 +30,7 @@ The supported field types in the destination struct are:
 * `struct` and `struct anonymous`
 * `map`
 * `interface{}`
+* custom types to one of the above types
 * a pointer to one of the above types
 
 Usage
