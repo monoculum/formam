@@ -33,7 +33,7 @@ The supported field types in the destination struct are:
 * `custom types` to one of the above types
 * a `pointer` to one of the above types
 
-NOTE: the nesting in maps, structs and slices can be ad infinitum.
+**NOTE**: the nesting in maps, structs and slices can be ad infinitum.
 
 Usage
 -----
