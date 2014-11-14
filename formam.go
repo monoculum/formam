@@ -11,8 +11,7 @@ import (
 
 const TAG_NAME = "formam"
 
-// A decoder holds the values from form, the 'reflect' value of main struct
-// and the 'reflect' value of current path
+// A pathMap holds the values of a map with its key and values correspondent
 type pathMap struct {
 	m reflect.Value
 
@@ -20,8 +19,10 @@ type pathMap struct {
 	value reflect.Value
 }
 
+// a pathMaps holds the values for  each key
 type pathMaps []*pathMap
 
+// find find and get the value by the given key
 func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
 	for _, v := range ma {
 		if v.m == id && v.key == key {
@@ -31,6 +32,8 @@ func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
 	return nil
 }
 
+// A decoder holds the values from form, the 'reflect' value of main struct
+// and the 'reflect' value of current path
 type decoder struct {
 	main reflect.Value
 	curr reflect.Value
@@ -42,7 +45,7 @@ type decoder struct {
 	index int
 }
 
-// NewDecoder generates a decoder struct with url.Values and struct provided by argument
+// Decode decode the url.Values into struct provided by argument
 func Decode(vv url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr || main.Elem().Kind() != reflect.Struct {
@@ -57,19 +60,13 @@ func Decode(vv url.Values, dst interface{}) error {
 		}
 	}
 	for _, v := range d.maps {
-		k := reflect.New(v.m.Type().Key()).Elem()
-		d.curr = k
-		d.value = v.key
-		if err := d.decode(); err != nil {
-			return err
-		}
-		v.m.SetMapIndex(d.curr, v.value)
+		v.m.SetMapIndex(reflect.ValueOf(v.key), v.value)
 	}
 	d.maps = []*pathMap{}
 	return nil
 }
 
-// decode prepare the path of the current key of map to walk through it
+// decode prepare the current path to walk through it
 func (d *decoder) begin() (err error) {
 	d.curr = d.main
 	fields := strings.Split(d.field, ".")
@@ -106,7 +103,7 @@ func (d *decoder) begin() (err error) {
 	return
 }
 
-// walk traverse the path to the final field for set the value
+// walk traverse the current path until to the last field
 func (d *decoder) walk() (reflect.Value, error) {
 	switch d.curr.Kind() {
 	case reflect.Struct:
@@ -135,7 +132,7 @@ func (d *decoder) walk() (reflect.Value, error) {
 	return d.curr, nil
 }
 
-// end find the last field for decode/set its value correspondent
+// end find the last field for decode its value correspondent
 func (d *decoder) end() error {
 	if d.curr.Kind() == reflect.Struct {
 		if err := d.findField(); err != nil {
