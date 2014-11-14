@@ -10,6 +10,11 @@ Dependencies
 
 The only requirement is [Go 1.2](http://golang.org/doc/go1.2) or later.
 
+Performance
+-----------
+
+You can see the performance in [formam-benchmark](https://github.com/monoculum/formam-benchmark) compared with [ajg/form](https://github.com/ajg/form), [gorilla/schema](https://github.com/gorilla/schema) and [built-in/json](http://golang.org/pkg/encoding/json/).
+
 Types
 -----
 
@@ -80,8 +85,3 @@ func MyHandler(w http.ResponseWriter, r *http.Request) error {
   return nil
 }
 ```
-
-Performance
------------
-
-You can see the performance in [formam-benchmark](https://github.com/monoculum/formam-benchmark) compared with [ajg/form](https://github.com/ajg/form), [gorilla/schema](https://github.com/gorilla/schema) and built-in/json.
