@@ -21,7 +21,7 @@ The supported field types in the destination struct are:
 * `uint`, `uint8`, `uint16`, `uint32`, `uint64`
 * `float32`, `float64`
 * `slice`, `array`
-* `struct`
+* `struct` and `struct anonymous`
 * `map`
 * `interface{}`
 * a pointer to one of the above types
