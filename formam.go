@@ -1,3 +1,4 @@
+// Package formam implements functions to decode values of a html's form.
 package formam
 
 import (
