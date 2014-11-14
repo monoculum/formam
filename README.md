@@ -4,6 +4,7 @@ formam
 a package for decode form's values into struct in Go
 
 [![Build Status](https://travis-ci.org/monoculum/formam.png?branch=master)](https://travis-ci.org/ajg/form)
+[![GoDoc](https://godoc.org/github.com/monoculum/formam?status.png)](https://godoc.org/github.com/monoculum/formam)
 
 Dependencies
 ------------
