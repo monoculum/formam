@@ -33,12 +33,12 @@ The supported field types in the destination struct are:
 * `custom types` to one of the above types
 * a `pointer` to one of the above types
 
-**NOTE**: the nesting in maps, structs and slices can be ad infinitum.
+**NOTE**: the nesting in `maps`, `structs` and `slices` can be ad infinitum.
 
 Usage
 -----
 
-### In the form html
+### In form html
 
 - Use symbol `.` for access a field/key of a structure or map. (i.e, `struct.key`)
 - Use `[int_here]` for access to index of a slice/array. (i.e, `struct.array[0]`)
