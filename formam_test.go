@@ -52,8 +52,8 @@ var valuesFormam = url.Values{
 	"Bool":     []string{"true"},
 	"tag":      []string{"tagged"},
 	"Ptr":      []string{"this is a pointer to string"},
-	"Time": []string{"2006-10-08"},
-	"URL":  []string{"https://www.golang.org"},
+	"Time":     []string{"2006-10-08"},
+	"URL":      []string{"https://www.golang.org"},
 }
 
 func TestDecode(t *testing.T) {
