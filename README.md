@@ -30,6 +30,8 @@ The supported field types in the destination struct are:
 * `struct` and `struct anonymous`
 * `map`
 * `interface{}`
+* `time.Time`
+* `url.URL`
 * `custom types` to one of the above types
 * a `pointer` to one of the above types
 
@@ -56,6 +58,8 @@ Usage
   <input type="text" name="Founders[0]" value="Akio Morita"/>
   <input type="text" name="Employees" value="90000"/>
   <input type="text" name="public" value="true"/>
+  <input type="text" name="url" value="http://www.sony.net"/>
+  <input type="date" name="foundation" value="1946-05-07"/>
   <input type="submit"/>
 </form>
 ```
@@ -66,18 +70,20 @@ You can use the tag `formam` if the name of a input of form starts lowercase.
 
 ```go
 type Company struct {
-  Public    bool      `formam:"public"`
-  Name      string
-  Location  struct{
-    Country string
-    City    string
+  Public     bool      `formam:"public"`
+  URL        url.URL   `formam:"url"`
+  Foundation time.Time `formam:"foundation"`
+  Name       string
+  Location   struct {
+    Country  string
+    City     string
   }
-  Products  []struct{
+  Products   []struct {
     Name string
     Type string
   }
-  Founders  []string
-  Employees int64
+  Founders   []string
+  Employees  int64
 }
 
 func MyHandler(w http.ResponseWriter, r *http.Request) error {
