@@ -30,6 +30,7 @@ type Test struct {
 	Tag  string `formam:"tag"`
 	Anonymous
 	Time time.Time
+	URL  url.URL
 }
 
 var valuesFormam = url.Values{
@@ -52,6 +53,7 @@ var valuesFormam = url.Values{
 	"tag":      []string{"tagged"},
 	"Ptr":      []string{"this is a pointer to string"},
 	"Time": []string{"2006-10-08"},
+	"URL":  []string{"https://www.golang.org"},
 }
 
 func TestDecode(t *testing.T) {

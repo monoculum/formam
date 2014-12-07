@@ -202,6 +202,12 @@ func (d *decoder) decode() error {
 				return fmt.Errorf("formam: the value of field \"%v\" is not a valid datetime", d.field)
 			}
 			d.curr.Set(reflect.ValueOf(t))
+		case url.URL:
+			u, err := url.Parse(d.value)
+			if err != nil {
+				return fmt.Errorf("formam: the value of field \"%v\" is not a valid url", d.field)
+			}
+			d.curr.Set(reflect.ValueOf(*u))
 		default:
 			return fmt.Errorf("formam: not supported type for field \"%v\"", d.field)
 		}
