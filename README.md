@@ -58,7 +58,7 @@ Usage
   <input type="text" name="Founders[0]" value="Akio Morita"/>
   <input type="text" name="Employees" value="90000"/>
   <input type="text" name="public" value="true"/>
-  <input type="text" name="url" value="http://www.sony.net"/>
+  <input type="url" name="website" value="http://www.sony.net"/>
   <input type="date" name="foundation" value="1946-05-07"/>
   <input type="submit"/>
 </form>
@@ -71,7 +71,7 @@ You can use the tag `formam` if the name of a input of form starts lowercase.
 ```go
 type Company struct {
   Public     bool      `formam:"public"`
-  URL        url.URL   `formam:"url"`
+  Website    url.URL   `formam:"website"`
   Foundation time.Time `formam:"foundation"`
   Name       string
   Location   struct {
