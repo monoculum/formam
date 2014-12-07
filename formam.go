@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const TAG_NAME = "formam"
@@ -162,19 +163,19 @@ func (d *decoder) decode() error {
 		d.curr.SetString(d.value)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if num, err := strconv.ParseInt(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid signed integer number", d.field)
+			return fmt.Errorf("formam: the value of field \"%v\" should be a valid signed integer number", d.field)
 		} else {
 			d.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if num, err := strconv.ParseUint(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid unsigned integer number", d.field)
+			return fmt.Errorf("formam: the value of field \"%v\" should be a valid unsigned integer number", d.field)
 		} else {
 			d.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
 		if num, err := strconv.ParseFloat(d.value, d.curr.Type().Bits()); err != nil {
-			return fmt.Errorf("formam: the value \"%v\" should be a valid float number", d.field)
+			return fmt.Errorf("formam: the value of field \"%v\" should be a valid float number", d.field)
 		} else {
 			d.curr.SetFloat(num)
 		}
@@ -182,10 +183,10 @@ func (d *decoder) decode() error {
 		switch d.value {
 		case "true", "on", "1":
 			d.curr.SetBool(true)
-		case "false", "0":
+		case "false", "off", "0":
 			d.curr.SetBool(false)
 		default:
-			return fmt.Errorf("formam: the value \"%v\" is not a valid boolean", d.field)
+			return fmt.Errorf("formam: the value of field \"%v\" is not a valid boolean", d.field)
 		}
 	case reflect.Interface:
 		d.curr.Set(reflect.ValueOf(d.value))
@@ -193,6 +194,17 @@ func (d *decoder) decode() error {
 		d.curr.Set(reflect.New(d.curr.Type().Elem()))
 		d.curr = d.curr.Elem()
 		return d.decode()
+	case reflect.Struct:
+		switch d.curr.Interface().(type) {
+		case time.Time:
+			t, err := time.Parse("2006-01-02", d.value)
+			if err != nil {
+				return fmt.Errorf("formam: the value of field \"%v\" is not a valid datetime", d.field)
+			}
+			d.curr.Set(reflect.ValueOf(t))
+		default:
+			return fmt.Errorf("formam: not supported type for field \"%v\"", d.field)
+		}
 	default:
 		return fmt.Errorf("formam: not supported type for field \"%v\"", d.field)
 	}
@@ -211,8 +223,13 @@ func (d *decoder) findField() error {
 			return nil
 		} else if field.Anonymous {
 			// if the field is a anonymous struct, then iterate over its fields
+			tmp := d.curr
 			d.curr = d.curr.FieldByIndex(field.Index)
-			return d.findField()
+			if err := d.findField(); err != nil {
+				d.curr = tmp
+				continue
+			}
+			return nil
 		} else if d.field == field.Tag.Get(TAG_NAME) {
 			// is not found yet, then retry by its tag name "formam"
 			d.curr = d.curr.Field(i)

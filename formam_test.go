@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 )
 
 type Anonymous struct {
@@ -28,6 +29,7 @@ type Test struct {
 	Ptr  *string
 	Tag  string `formam:"tag"`
 	Anonymous
+	Time time.Time
 }
 
 var valuesFormam = url.Values{
@@ -49,6 +51,7 @@ var valuesFormam = url.Values{
 	"Bool":     []string{"true"},
 	"tag":      []string{"tagged"},
 	"Ptr":      []string{"this is a pointer to string"},
+	"Time": []string{"2006-10-08"},
 }
 
 func TestDecode(t *testing.T) {
