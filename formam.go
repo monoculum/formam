@@ -112,6 +112,10 @@ func (d *decoder) walk() (reflect.Value, error) {
 		if err := d.findField(); err != nil {
 			return d.curr, err
 		}
+		if d.curr.Kind() == reflect.Ptr {
+			d.curr.Set(reflect.New(d.curr.Type().Elem()))
+			d.curr = d.curr.Elem()
+		}
 	case reflect.Map:
 		d.currentMap()
 	case reflect.Ptr:

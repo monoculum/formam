@@ -11,6 +11,10 @@ type Anonymous struct {
 	Int int `formam:"int"`
 }
 
+type PtrStruct struct {
+	String *string
+}
+
 type Test struct {
 	Nest struct {
 		Children []struct {
@@ -31,6 +35,7 @@ type Test struct {
 	Anonymous
 	Time time.Time
 	URL  url.URL
+	PtrStruct *PtrStruct
 }
 
 var valuesFormam = url.Values{
@@ -54,6 +59,7 @@ var valuesFormam = url.Values{
 	"Ptr":      []string{"this is a pointer to string"},
 	"Time":     []string{"2006-10-08"},
 	"URL":      []string{"https://www.golang.org"},
+	"PtrStruct.String": []string{"dashaus"},
 }
 
 func TestDecode(t *testing.T) {
