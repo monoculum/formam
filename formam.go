@@ -107,24 +107,24 @@ func (d *decoder) begin() (err error) {
 
 // walk traverse the current path until to the last field
 func (d *decoder) walk() (reflect.Value, error) {
-	switch d.curr.Kind() {
+	// check if is a struct or map
+    switch d.curr.Kind() {
 	case reflect.Struct:
 		if err := d.findField(); err != nil {
 			return d.curr, err
 		}
-		if d.curr.Kind() == reflect.Ptr {
-			d.curr.Set(reflect.New(d.curr.Type().Elem()))
-			d.curr = d.curr.Elem()
-		}
 	case reflect.Map:
 		d.currentMap()
-	case reflect.Ptr:
-		d.curr.Set(reflect.New(d.curr.Type().Elem()))
-		d.curr = d.curr.Elem()
-		return d.walk()
 	}
+    // check if the struct or map is a pointer
+    if d.curr.Kind() == reflect.Ptr {
+        if d.curr.IsNil() {
+            d.curr.Set(reflect.New(d.curr.Type().Elem()))
+        }
+        d.curr = d.curr.Elem()
+    }
+    // finally, check if there are access to slice/array or not...
 	if d.index != -1 {
-		// should be a array...
 		switch d.curr.Kind() {
 		case reflect.Slice, reflect.Array:
 			if d.curr.Len() <= d.index {
