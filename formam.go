@@ -42,6 +42,7 @@ type decoder struct {
 
 	maps pathMaps
 
+	path  string
 	field string
 	value string
 	index int
@@ -55,6 +56,7 @@ func Decode(vs url.Values, dst interface{}) error {
 	}
 	d := &decoder{main: main.Elem()}
 	for k, v := range vs {
+		d.path = k
 		d.field = k
 		d.value = v[0]
         if d.value != "" {
@@ -134,7 +136,7 @@ func (d *decoder) walk() (reflect.Value, error) {
 			}
 			d.curr = d.curr.Index(d.index)
 		default:
-			return d.curr, fmt.Errorf("formam: the field \"%v\" has a index for array but it is not", d.field)
+			return d.curr, fmt.Errorf("formam: the field \"%v\" in path \"%v\" has a index for array but it is not", d.field, d.path)
 		}
 	}
 	return d.curr, nil
@@ -169,19 +171,19 @@ func (d *decoder) decode() error {
 		d.curr.SetString(d.value)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if num, err := strconv.ParseInt(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value of field \"%v\" should be a valid signed integer number", d.field)
+			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" should be a valid signed integer number", d.field, d.path)
 		} else {
 			d.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if num, err := strconv.ParseUint(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value of field \"%v\" should be a valid unsigned integer number", d.field)
+			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" should be a valid unsigned integer number", d.field, d.path)
 		} else {
 			d.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
 		if num, err := strconv.ParseFloat(d.value, d.curr.Type().Bits()); err != nil {
-			return fmt.Errorf("formam: the value of field \"%v\" should be a valid float number", d.field)
+			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" should be a valid float number", d.field, d.path)
 		} else {
 			d.curr.SetFloat(num)
 		}
@@ -192,7 +194,7 @@ func (d *decoder) decode() error {
 		case "false", "off", "0":
 			d.curr.SetBool(false)
 		default:
-			return fmt.Errorf("formam: the value of field \"%v\" is not a valid boolean", d.field)
+			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" is not a valid boolean", d.field, d.path)
 		}
 	case reflect.Interface:
 		d.curr.Set(reflect.ValueOf(d.value))
@@ -205,20 +207,20 @@ func (d *decoder) decode() error {
 		case time.Time:
 			t, err := time.Parse("2006-01-02", d.value)
 			if err != nil {
-				return fmt.Errorf("formam: the value of field \"%v\" is not a valid datetime", d.field)
+				return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" is not a valid datetime", d.field, d.path)
 			}
 			d.curr.Set(reflect.ValueOf(t))
 		case url.URL:
 			u, err := url.Parse(d.value)
 			if err != nil {
-				return fmt.Errorf("formam: the value of field \"%v\" is not a valid url", d.field)
+				return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" is not a valid url", d.field, d.path)
 			}
 			d.curr.Set(reflect.ValueOf(*u))
 		default:
-			return fmt.Errorf("formam: not supported type for field \"%v\"", d.field)
+			return fmt.Errorf("formam: not supported type for field \"%v\" in path \"%v\"", d.field, d.path)
 		}
 	default:
-		return fmt.Errorf("formam: not supported type for field \"%v\"", d.field)
+		return fmt.Errorf("formam: not supported type for field \"%v\" in path \"%v\"", d.field, d.path)
 	}
 	return nil
 }
@@ -248,7 +250,7 @@ func (d *decoder) findField() error {
 			return nil
 		}
 	}
-	return fmt.Errorf("formam: not found the field \"%v\"", d.field)
+	return fmt.Errorf("formam: not found the field \"%v\" in the path \"%v\"", d.field, d.path)
 }
 
 // expandSlice expand the length and capacity of the current slice
