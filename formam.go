@@ -57,9 +57,11 @@ func Decode(vs url.Values, dst interface{}) error {
 	for k, v := range vs {
 		d.field = k
 		d.value = v[0]
-		if err := d.begin(); err != nil {
-			return err
-		}
+        if d.value != "" {
+            if err := d.begin(); err != nil {
+                return err
+            }
+        }
 	}
 	for _, v := range d.maps {
 		v.m.SetMapIndex(reflect.ValueOf(v.key), v.value)
