@@ -18,7 +18,6 @@ type PtrStruct struct {
 type Macho string
 
 func (s *Macho) UnmarshalText(text []byte) error {
-    fmt.Println("JAJAJA")
     *s = "the string has changed by UnmarshalText method"
 	return nil
 }
@@ -78,5 +77,5 @@ func TestDecode(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println("END: ", test)
+	fmt.Println("result: ", test)
 }
