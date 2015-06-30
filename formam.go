@@ -94,7 +94,7 @@ func (d *decoder) begin() (err error) {
 			if len(fields) == i+1 {
 				return d.end()
 			}
-			if d.curr, err = d.walk(); err != nil {
+			if err = d.walk(); err != nil {
 				return
 			}
 		} else {
@@ -104,7 +104,7 @@ func (d *decoder) begin() (err error) {
 			if len(fields) == i+1 {
 				return d.end()
 			}
-			if d.curr, err = d.walk(); err != nil {
+			if err = d.walk(); err != nil {
 				return
 			}
 		}
@@ -113,12 +113,12 @@ func (d *decoder) begin() (err error) {
 }
 
 // walk traverse the current path until to the last field
-func (d *decoder) walk() (reflect.Value, error) {
+func (d *decoder) walk() (error) {
 	// check if is a struct or map
     switch d.curr.Kind() {
 	case reflect.Struct:
 		if err := d.findField(); err != nil {
-			return d.curr, err
+			return err
 		}
 	case reflect.Map:
 		d.currentMap()
@@ -139,10 +139,10 @@ func (d *decoder) walk() (reflect.Value, error) {
 			}
 			d.curr = d.curr.Index(d.index)
 		default:
-			return d.curr, fmt.Errorf("formam: the field \"%v\" in path \"%v\" has a index for array but it is not", d.field, d.path)
+			return fmt.Errorf("formam: the field \"%v\" in path \"%v\" has a index for array but it is not", d.field, d.path)
 		}
 	}
-	return d.curr, nil
+	return nil
 }
 
 // end find the last field for decode its value correspondent
