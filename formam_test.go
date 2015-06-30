@@ -15,6 +15,14 @@ type PtrStruct struct {
 	String *string
 }
 
+type Macho string
+
+func (s *Macho) UnmarshalText(text []byte) error {
+    fmt.Println("JAJAJA")
+    *s = "the string has changed by UnmarshalText method"
+	return nil
+}
+
 type Test struct {
 	Nest struct {
 		Children []struct {
@@ -36,6 +44,7 @@ type Test struct {
 	Time time.Time
 	URL  url.URL
 	PtrStruct *PtrStruct
+	UnmarshalText Macho
 }
 
 var valuesFormam = url.Values{
@@ -60,6 +69,7 @@ var valuesFormam = url.Values{
 	"Time":     []string{"2006-10-08"},
 	"URL":      []string{"https://www.golang.org"},
 	"PtrStruct.String": []string{"dashaus"},
+	"UnmarshalText": []string{"unmarshal text"},
 }
 
 func TestDecode(t *testing.T) {

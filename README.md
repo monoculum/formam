@@ -37,6 +37,11 @@ The supported field types in the destination struct are:
 
 **NOTE**: the nesting in `maps`, `structs` and `slices` can be ad infinitum.
 
+Custom Marshaling
+-----------------
+
+Is possible unmarshaling data by the `encoding.TextUnmarshaler` interface
+
 Usage
 -----
 

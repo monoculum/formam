@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"encoding"
 )
 
 const TAG_NAME = "formam"
@@ -38,7 +39,9 @@ func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
 // and the 'reflect' value of current path
 type decoder struct {
 	main reflect.Value
+
 	curr reflect.Value
+	typ reflect.Type
 
 	maps pathMaps
 
@@ -157,6 +160,13 @@ func (d *decoder) end() error {
 
 // decode set the value in its field
 func (d *decoder) decode() error {
+	ok, err := d.unmarshalText(d.curr)
+	if ok {
+		return err
+	} else if err != nil {
+		return err
+	}
+
 	switch d.curr.Kind() {
 	case reflect.Map:
 		d.currentMap()
@@ -275,4 +285,29 @@ func (d *decoder) currentMap() {
 	} else {
 		d.curr = a.value
 	}
+}
+
+var (
+	timeType = reflect.TypeOf(time.Time{})
+	timePType = reflect.TypeOf(&time.Time{})
+)
+
+func (d *decoder) unmarshalText(v reflect.Value) (bool, error) {
+	// skip if the type is time.Time
+	typ := v.Type()
+	if typ.ConvertibleTo(timeType) || typ.ConvertibleTo(timePType) {
+		return false, nil
+	}
+	// check if implements the interface
+	t, ok := v.Interface().(encoding.TextUnmarshaler)
+	if !ok {
+		if v.CanAddr() {
+			//return false, nil
+			return d.unmarshalText(v.Addr())
+		}
+		return false, nil
+	}
+	// return result
+	err := t.UnmarshalText([]byte(d.value))
+	return err == nil, err
 }
