@@ -300,12 +300,11 @@ func (d *decoder) unmarshalText(v reflect.Value) (bool, error) {
 	}
 	// check if implements the interface
 	t, ok := v.Interface().(encoding.TextUnmarshaler)
-	if !ok {
-		if v.CanAddr() {
-			//return false, nil
-			return d.unmarshalText(v.Addr())
-		}
+	canAddr := v.CanAddr()
+	if !ok && !canAddr {
 		return false, nil
+	} else if canAddr {
+		return d.unmarshalText(v.Addr())
 	}
 	// return result
 	err := t.UnmarshalText([]byte(d.value))

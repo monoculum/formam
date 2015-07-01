@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"testing"
 	"time"
+	"log"
 )
 
 type Anonymous struct {
@@ -18,7 +19,10 @@ type PtrStruct struct {
 type Macho string
 
 func (s *Macho) UnmarshalText(text []byte) error {
-    *s = "the string has changed by UnmarshalText method"
+	var n Macho
+	n = "the string has changed by UnmarshalText method"
+	log.Print("que es ", s)
+    *s = n
 	return nil
 }
 
