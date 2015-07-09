@@ -1,4 +1,4 @@
-// Package formam implements functions to decode values of a html's form.
+// Package formam implements functions to decode values of a html form.
 package formam
 
 import (
@@ -22,7 +22,7 @@ type pathMap struct {
 	value reflect.Value
 }
 
-// a pathMaps holds the values for  each key
+// a pathMaps holds the values for each key
 type pathMaps []*pathMap
 
 // find find and get the value by the given key
@@ -51,11 +51,11 @@ type decoder struct {
 	index int
 }
 
-// Decode decode the url.Values into struct provided by argument
+// Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
 func Decode(vs url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
-	if main.Kind() != reflect.Ptr || main.Elem().Kind() != reflect.Struct {
-		return errors.New("formam: is not a pointer to struct")
+	if (main.Kind() != reflect.Ptr) {
+		return fmt.Errorf("formam: the value passed for decode is not a pointer but a %v", main.Kind())
 	}
 	d := &decoder{main: main.Elem()}
 	for k, v := range vs {
@@ -112,7 +112,7 @@ func (d *decoder) begin() (err error) {
 	return
 }
 
-// walk traverse the current path until to the last field
+// walk traverses the current path until to the last field
 func (d *decoder) walk() (error) {
 	// check if is a struct or map
     switch d.curr.Kind() {
@@ -145,7 +145,7 @@ func (d *decoder) walk() (error) {
 	return nil
 }
 
-// end find the last field for decode its value correspondent
+// end finds the last field for decode its value correspondent
 func (d *decoder) end() error {
 	if d.curr.Kind() == reflect.Struct {
 		if err := d.findField(); err != nil {
@@ -158,7 +158,7 @@ func (d *decoder) end() error {
 	return d.decode()
 }
 
-// decode set the value in its field
+// decode sets the value in the last field found by end function
 func (d *decoder) decode() error {
 	ok, err := d.unmarshalText(d.curr)
 	if ok {
@@ -232,10 +232,11 @@ func (d *decoder) decode() error {
 	default:
 		return fmt.Errorf("formam: not supported type for field \"%v\" in path \"%v\"", d.field, d.path)
 	}
+
 	return nil
 }
 
-// findField find a field by its name, if it is not found,
+// findField finds a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
 func (d *decoder) findField() error {
 	num := d.curr.NumField()
@@ -263,14 +264,14 @@ func (d *decoder) findField() error {
 	return fmt.Errorf("formam: not found the field \"%v\" in the path \"%v\"", d.field, d.path)
 }
 
-// expandSlice expand the length and capacity of the current slice
+// expandSlice expands the length and capacity of the current slice
 func (d *decoder) expandSlice() {
 	sli := reflect.MakeSlice(d.curr.Type(), d.index+1, d.index+1)
 	reflect.Copy(sli, d.curr)
 	d.curr.Set(sli)
 }
 
-// currentMap get in d.curr the map concrete for decode the current value
+// currentMap gets in d.curr the map concrete for decode the current value
 func (d *decoder) currentMap() {
 	typ := d.curr.Type()
 	if d.curr.IsNil() {

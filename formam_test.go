@@ -16,17 +16,17 @@ type PtrStruct struct {
 	String *string
 }
 
-type Macho string
+type UText string
 
-func (s *Macho) UnmarshalText(text []byte) error {
-	var n Macho
+func (s *UText) UnmarshalText(text []byte) error {
+	var n UText
 	n = "the string has changed by UnmarshalText method"
 	log.Print("que es ", s)
     *s = n
 	return nil
 }
 
-type Test struct {
+type TestStruct struct {
 	Nest struct {
 		Children []struct {
 			Id   string
@@ -47,10 +47,10 @@ type Test struct {
 	Time time.Time
 	URL  url.URL
 	PtrStruct *PtrStruct
-	UnmarshalText Macho
+	UnmarshalText UText
 }
 
-var valuesFormam = url.Values{
+var structValues = url.Values{
 	"Nest.Children[0].Id":                                []string{"monoculum_id"},
 	"Nest.Children[0].Name":                              []string{"Monoculum"},
 	"MapSlice.names[0]":                                  []string{"shinji"},
@@ -75,11 +75,27 @@ var valuesFormam = url.Values{
 	"UnmarshalText": []string{"unmarshal text"},
 }
 
-func TestDecode(t *testing.T) {
-	test := &Test{}
-	err := Decode(valuesFormam, test)
+func TestDecodeInStruct(t *testing.T) {
+	var t1 TestStruct
+	err := Decode(structValues, &t1)
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println("result: ", test)
+	fmt.Println("result: ", t1)
+}
+
+type TestSlice []string
+
+var sliceValues = url.Values{
+	"[0]": []string{"spanish"},
+	"[1]": []string{"english"},
+}
+
+func TestDecodeInSlice(t *testing.T) {
+	var t2 TestSlice
+	err := Decode(sliceValues, &t2)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println("result: ", t2)
 }
