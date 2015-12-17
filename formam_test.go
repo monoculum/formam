@@ -5,11 +5,11 @@ import (
 	"net/url"
 	"testing"
 	"time"
-	"log"
 )
 
 type Anonymous struct {
-	Int int `formam:"int"`
+	Int int
+	AnonymousField string
 }
 
 type PtrStruct struct {
@@ -21,12 +21,13 @@ type UText string
 func (s *UText) UnmarshalText(text []byte) error {
 	var n UText
 	n = "the string has changed by UnmarshalText method"
-	log.Print("que es ", s)
     *s = n
 	return nil
 }
 
 type TestStruct struct {
+	Anonymous
+	Int []string
 	Nest struct {
 		Children []struct {
 			Id   string
@@ -43,7 +44,6 @@ type TestStruct struct {
 	Bool bool
 	Ptr  *string
 	Tag  string `formam:"tag"`
-	Anonymous
 	Time time.Time
 	URL  url.URL
 	PtrStruct *PtrStruct
@@ -65,7 +65,8 @@ var structValues = url.Values{
 	"MapMapMapStruct.map.struct.are.recursive.Recursive": []string{"true"},
 	"Slice[0]": []string{"1"},
 	"Slice[1]": []string{"2"},
-	"int":      []string{"1"}, // Int is located inside Anonymous struct
+	"Int[0]":      []string{"10"}, // Int is located inside Anonymous struct
+	"AnonymousField": []string{"anonymous!"},
 	"Bool":     []string{"true"},
 	"tag":      []string{"tagged"},
 	"Ptr":      []string{"this is a pointer to string"},

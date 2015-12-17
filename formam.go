@@ -239,6 +239,8 @@ func (d *decoder) decode() error {
 // findField finds a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
 func (d *decoder) findField() error {
+	var anon reflect.Value
+
 	num := d.curr.NumField()
 	for i := 0; i < num; i++ {
 		field := d.curr.Type().Field(i)
@@ -254,13 +256,23 @@ func (d *decoder) findField() error {
 				d.curr = tmp
 				continue
 			}
-			return nil
+			// field in anonymous struct is found,
+			// but first it should found the field in the rest of struct
+			// (a field with same name in the current struct should have preference over anonymous struct)
+			anon = d.curr
+			d.curr = tmp
 		} else if d.field == field.Tag.Get(TAG_NAME) {
 			// is not found yet, then retry by its tag name "formam"
 			d.curr = d.curr.Field(i)
 			return nil
 		}
 	}
+
+	if anon.IsValid() {
+		d.curr = anon
+		return nil
+	}
+
 	return fmt.Errorf("formam: not found the field \"%v\" in the path \"%v\"", d.field, d.path)
 }
 
