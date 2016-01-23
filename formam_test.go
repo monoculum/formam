@@ -1,14 +1,37 @@
 package formam
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"testing"
 	"time"
 )
 
+type Text string
+
+func (s *Text) UnmarshalText(text []byte) error {
+	var n Text
+	n = "the string has changed by UnmarshalText method"
+	*s = n
+	return nil
+}
+
+type UUID [16]byte
+
+func (u *UUID) UnmarshalText(text []byte) error {
+	if len(text) != 32 {
+		return fmt.Errorf("text must be exactly 16 bytes long, got %d bytes", len(text))
+	}
+	_, err := hex.Decode(u[:], text)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type Anonymous struct {
-	Int int
+	Int            int
 	AnonymousField string
 }
 
@@ -16,18 +39,9 @@ type PtrStruct struct {
 	String *string
 }
 
-type UText string
-
-func (s *UText) UnmarshalText(text []byte) error {
-	var n UText
-	n = "the string has changed by UnmarshalText method"
-    *s = n
-	return nil
-}
-
 type TestStruct struct {
 	Anonymous
-	Int []string
+	Int  []string
 	Nest struct {
 		Children []struct {
 			Id   string
@@ -41,13 +55,15 @@ type TestStruct struct {
 	MapMapMapStruct map[string]map[string]map[string]map[string]struct {
 		Recursive bool
 	}
-	Bool bool
-	Ptr  *string
-	Tag  string `formam:"tag"`
-	Time time.Time
-	URL  url.URL
-	PtrStruct *PtrStruct
-	UnmarshalText UText
+	Bool            bool
+	Ptr             *string
+	Tag             string `formam:"tag"`
+	Time            time.Time
+	URL             url.URL
+	PtrStruct       *PtrStruct
+	UnmarshalText   Text
+	MapCustomKey    map[UUID]string
+	MapCustomKeyPtr map[*UUID]string
 }
 
 var structValues = url.Values{
@@ -63,17 +79,19 @@ var structValues = url.Values{
 	"MapMap.titles.es_es":                                []string{"El viaje de Chihiro"},
 	"MapMap.titles.en_us":                                []string{"The spirit away"},
 	"MapMapMapStruct.map.struct.are.recursive.Recursive": []string{"true"},
-	"Slice[0]": []string{"1"},
-	"Slice[1]": []string{"2"},
-	"Int[0]":      []string{"10"}, // Int is located inside Anonymous struct
-	"AnonymousField": []string{"anonymous!"},
-	"Bool":     []string{"true"},
-	"tag":      []string{"tagged"},
-	"Ptr":      []string{"this is a pointer to string"},
-	"Time":     []string{"2006-10-08"},
-	"URL":      []string{"https://www.golang.org"},
-	"PtrStruct.String": []string{"dashaus"},
-	"UnmarshalText": []string{"unmarshal text"},
+	"Slice[0]":                                         []string{"1"},
+	"Slice[1]":                                         []string{"2"},
+	"Int[0]":                                           []string{"10"}, // Int is located inside Anonymous struct
+	"AnonymousField":                                   []string{"anonymous!"},
+	"Bool":                                             []string{"true"},
+	"tag":                                              []string{"tagged"},
+	"Ptr":                                              []string{"this is a pointer to string"},
+	"Time":                                             []string{"2006-10-08"},
+	"URL":                                              []string{"https://www.golang.org"},
+	"PtrStruct.String":                                 []string{"dashaus"},
+	"UnmarshalText":                                    []string{"unmarshal text"},
+	"MapCustomKey.11e5bf2d3e403a8c86740023dffe5350":    []string{"Princess Mononoke"},
+	"MapCustomKeyPtr.11e5bf2d3e403a8c86740023dffe5350": []string{"*Princess Mononoke"},
 }
 
 func TestDecodeInStruct(t *testing.T) {

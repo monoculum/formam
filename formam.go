@@ -2,6 +2,7 @@
 package formam
 
 import (
+	"encoding"
 	"errors"
 	"fmt"
 	"net/url"
@@ -9,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"encoding"
 )
 
 const TAG_NAME = "formam"
@@ -20,6 +20,8 @@ type pathMap struct {
 
 	key   string
 	value reflect.Value
+
+	path string
 }
 
 // a pathMaps holds the values for each key
@@ -41,7 +43,7 @@ type decoder struct {
 	main reflect.Value
 
 	curr reflect.Value
-	typ reflect.Type
+	typ  reflect.Type
 
 	maps pathMaps
 
@@ -54,7 +56,7 @@ type decoder struct {
 // Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
 func Decode(vs url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
-	if (main.Kind() != reflect.Ptr) {
+	if main.Kind() != reflect.Ptr {
 		return fmt.Errorf("formam: the value passed for decode is not a pointer but a %v", main.Kind())
 	}
 	d := &decoder{main: main.Elem()}
@@ -62,14 +64,39 @@ func Decode(vs url.Values, dst interface{}) error {
 		d.path = k
 		d.field = k
 		d.value = v[0]
-        if d.value != "" {
-            if err := d.begin(); err != nil {
-                return err
-            }
-        }
+		if d.value != "" {
+			if err := d.begin(); err != nil {
+				return err
+			}
+		}
 	}
 	for _, v := range d.maps {
-		v.m.SetMapIndex(reflect.ValueOf(v.key), v.value)
+		key := v.m.Type().Key()
+		switch key.Kind() {
+		case reflect.String:
+			// the key is a string
+			v.m.SetMapIndex(reflect.ValueOf(v.key), v.value)
+		default:
+			// must to implement the TextUnmarshaler interface for to can to decode the map's key
+			var vv reflect.Value
+
+			if key.Kind() == reflect.Ptr {
+				vv = reflect.New(key.Elem())
+			} else {
+				vv = reflect.New(key).Elem()
+			}
+
+			d.value = v.key
+			ok, err := d.unmarshalText(vv)
+			if !ok {
+				return fmt.Errorf("formam: the key with %s type (%v) in the path %v should implements the TextUnmarshaler interface for to can decode it", key, v.m.Type(), v.path)
+			}
+			if err != nil {
+				return fmt.Errorf("formam: an error has occured in the UnmarshalText method for type %s: %s", key, err)
+			}
+
+			v.m.SetMapIndex(vv, v.value)
+		}
 	}
 	d.maps = []*pathMap{}
 	return nil
@@ -113,9 +140,9 @@ func (d *decoder) begin() (err error) {
 }
 
 // walk traverses the current path until to the last field
-func (d *decoder) walk() (error) {
+func (d *decoder) walk() error {
 	// check if is a struct or map
-    switch d.curr.Kind() {
+	switch d.curr.Kind() {
 	case reflect.Struct:
 		if err := d.findField(); err != nil {
 			return err
@@ -123,14 +150,14 @@ func (d *decoder) walk() (error) {
 	case reflect.Map:
 		d.currentMap()
 	}
-    // check if the struct or map is a pointer
-    if d.curr.Kind() == reflect.Ptr {
-        if d.curr.IsNil() {
-            d.curr.Set(reflect.New(d.curr.Type().Elem()))
-        }
-        d.curr = d.curr.Elem()
-    }
-    // finally, check if there are access to slice/array or not...
+	// check if the struct or map is a pointer
+	if d.curr.Kind() == reflect.Ptr {
+		if d.curr.IsNil() {
+			d.curr.Set(reflect.New(d.curr.Type().Elem()))
+		}
+		d.curr = d.curr.Elem()
+	}
+	// finally, check if there are access to slice/array or not...
 	if d.index != -1 {
 		switch d.curr.Kind() {
 		case reflect.Slice, reflect.Array:
@@ -289,11 +316,11 @@ func (d *decoder) currentMap() {
 	if d.curr.IsNil() {
 		d.curr.Set(reflect.MakeMap(typ))
 		v := reflect.New(typ.Elem()).Elem()
-		d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
+		d.maps = append(d.maps, &pathMap{d.curr, d.field, v, d.path})
 		d.curr = v
 	} else if a := d.maps.find(d.curr, d.field); a == nil {
 		v := reflect.New(typ.Elem()).Elem()
-		d.maps = append(d.maps, &pathMap{d.curr, d.field, v})
+		d.maps = append(d.maps, &pathMap{d.curr, d.field, v, d.path})
 		d.curr = v
 	} else {
 		d.curr = a.value
@@ -301,10 +328,12 @@ func (d *decoder) currentMap() {
 }
 
 var (
-	timeType = reflect.TypeOf(time.Time{})
+	timeType  = reflect.TypeOf(time.Time{})
 	timePType = reflect.TypeOf(&time.Time{})
 )
 
+// unmarshalText returns a boolean and error. The boolean is true if the
+// value implements TextUnmarshaler, and false if not.
 func (d *decoder) unmarshalText(v reflect.Value) (bool, error) {
 	// skip if the type is time.Time
 	typ := v.Type()
@@ -321,5 +350,5 @@ func (d *decoder) unmarshalText(v reflect.Value) (bool, error) {
 	}
 	// return result
 	err := t.UnmarshalText([]byte(d.value))
-	return err == nil, err
+	return true, err
 }
