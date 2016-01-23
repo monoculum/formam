@@ -89,7 +89,7 @@ func (d *decoder) begin() (err error) {
 			}
 			d.field = field[:b]
 			if d.index, err = strconv.Atoi(field[b+1 : e]); err != nil {
-				return errors.New("formam: the index of array not is a number")
+				return errors.New("formam: the index of array is not a number")
 			}
 			if len(fields) == i+1 {
 				return d.end()
