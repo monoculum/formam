@@ -97,12 +97,12 @@ type Company struct {
   Founders   []string
   Employees  int64
   
-  ExampleInterface interface{}
+  Interface interface{}
 }
 
 func MyHandler(w http.ResponseWriter, r *http.Request) error {
   m := Company{
-      ExampleInterface: &InterfaceStruct{},
+      Interface: &InterfaceStruct{},
   }
   r.ParseForm()
   if err := formam.Decode(r.Form, &m); err != nil {
