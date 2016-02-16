@@ -8,6 +8,7 @@ formam.iml
 _obj
 _test
 .idea
+tmp
 
 # Architecture specific extensions/prefixes
 *.[568vq]
