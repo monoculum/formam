@@ -65,8 +65,8 @@ Usage
   <input type="text" name="public" value="true"/>
   <input type="url" name="website" value="http://www.sony.net"/>
   <input type="date" name="foundation" value="1946-05-07"/>
-  <input type="text" name="ExampleInterface.ID" value="12"/>
-  <input type="text" name="ExampleInterface.Name" value="Go Programming Language"/>
+  <input type="text" name="Interface.ID" value="12"/>
+  <input type="text" name="Interface.Name" value="Go Programming Language"/>
   <input type="submit"/>
 </form>
 ```
