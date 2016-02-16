@@ -65,6 +65,8 @@ Usage
   <input type="text" name="public" value="true"/>
   <input type="url" name="website" value="http://www.sony.net"/>
   <input type="date" name="foundation" value="1946-05-07"/>
+  <input type="text" name="ExampleInterface.ID" value="12"/>
+  <input type="text" name="ExampleInterface.Name" value="Go Programming Language"/>
   <input type="submit"/>
 </form>
 ```
@@ -74,6 +76,11 @@ Usage
 You can use the tag `formam` if the name of a input of form starts lowercase.
 
 ```go
+type InterfaceStruct struct {
+    ID   int
+    Name string
+}
+
 type Company struct {
   Public     bool      `formam:"public"`
   Website    url.URL   `formam:"website"`
@@ -89,12 +96,16 @@ type Company struct {
   }
   Founders   []string
   Employees  int64
+  
+  ExampleInterface interface{}
 }
 
 func MyHandler(w http.ResponseWriter, r *http.Request) error {
-  co := new(Company)
+  m := Company{
+      ExampleInterface: &InterfaceStruct{},
+  }
   r.ParseForm()
-  if err := formam.Decode(r.Form, co); err != nil {
+  if err := formam.Decode(r.Form, &m); err != nil {
   		return err
   }
   return nil
