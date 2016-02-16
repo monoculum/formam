@@ -40,7 +40,7 @@ The supported field types in the destination struct are:
 Custom Marshaling
 -----------------
 
-Is possible unmarshaling data by the `encoding.TextUnmarshaler` interface
+Is possible unmarshaling data and the key of a map by the `encoding.TextUnmarshaler` interface.
 
 Usage
 -----
