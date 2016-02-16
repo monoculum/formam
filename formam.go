@@ -150,6 +150,10 @@ func (d *decoder) walk() error {
 	case reflect.Map:
 		d.currentMap()
 	}
+	// check if the struct or map is a interface
+	if d.curr.Kind() == reflect.Interface {
+		d.curr = d.curr.Elem()
+	}
 	// check if the struct or map is a pointer
 	if d.curr.Kind() == reflect.Ptr {
 		if d.curr.IsNil() {
