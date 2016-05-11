@@ -47,10 +47,11 @@ type decoder struct {
 
 	maps pathMaps
 
-	path  string
-	field string
-	value string
-	index int
+	path   string
+	field  string
+	value  string
+	values []string
+	index  int
 }
 
 // Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
@@ -63,6 +64,7 @@ func Decode(vs url.Values, dst interface{}) error {
 	for k, v := range vs {
 		d.path = k
 		d.field = k
+		d.values = v
 		d.value = v[0]
 		if d.value != "" {
 			if err := d.begin(); err != nil {
@@ -144,7 +146,7 @@ func (d *decoder) walk() error {
 	// check if is a struct or map
 	switch d.curr.Kind() {
 	case reflect.Struct:
-		if err := d.findField(); err != nil {
+		if err := d.findStructField(); err != nil {
 			return err
 		}
 	case reflect.Map:
@@ -166,7 +168,7 @@ func (d *decoder) walk() error {
 		switch d.curr.Kind() {
 		case reflect.Slice, reflect.Array:
 			if d.curr.Len() <= d.index {
-				d.expandSlice()
+				d.expandSlice(d.index + 1)
 			}
 			d.curr = d.curr.Index(d.index)
 		default:
@@ -179,7 +181,7 @@ func (d *decoder) walk() error {
 // end finds the last field for decode its value correspondent
 func (d *decoder) end() error {
 	if d.curr.Kind() == reflect.Struct {
-		if err := d.findField(); err != nil {
+		if err := d.findStructField(); err != nil {
 			return err
 		}
 	}
@@ -203,8 +205,22 @@ func (d *decoder) decode() error {
 		d.currentMap()
 		return d.decode()
 	case reflect.Slice, reflect.Array:
+		if d.index == -1 {
+			// not has index, so to decode all values in the slice/array
+			d.expandSlice(len(d.values))
+			tmp := d.curr
+			for i, v := range d.values {
+				d.curr = tmp.Index(i)
+				d.value = v
+				if err := d.decode(); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		// has index, so to decode value by index indicated
 		if d.curr.Len() <= d.index {
-			d.expandSlice()
+			d.expandSlice(d.index + 1)
 		}
 		d.curr = d.curr.Index(d.index)
 		return d.decode()
@@ -269,7 +285,7 @@ func (d *decoder) decode() error {
 
 // findField finds a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
-func (d *decoder) findField() error {
+func (d *decoder) findStructField() error {
 	var anon reflect.Value
 
 	num := d.curr.NumField()
@@ -283,7 +299,7 @@ func (d *decoder) findField() error {
 			// if the field is a anonymous struct, then iterate over its fields
 			tmp := d.curr
 			d.curr = d.curr.FieldByIndex(field.Index)
-			if err := d.findField(); err != nil {
+			if err := d.findStructField(); err != nil {
 				d.curr = tmp
 				continue
 			}
@@ -308,8 +324,8 @@ func (d *decoder) findField() error {
 }
 
 // expandSlice expands the length and capacity of the current slice
-func (d *decoder) expandSlice() {
-	sli := reflect.MakeSlice(d.curr.Type(), d.index+1, d.index+1)
+func (d *decoder) expandSlice(length int) {
+	sli := reflect.MakeSlice(d.curr.Type(), length, length)
 	reflect.Copy(sli, d.curr)
 	d.curr.Set(sli)
 }

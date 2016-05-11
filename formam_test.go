@@ -55,17 +55,18 @@ type TestStruct struct {
 	MapRecursive map[string]map[string]map[string]struct {
 		Recursive bool
 	}
-	Bool            bool
-	Ptr             *string
-	Tag             string `formam:"tag"`
-	Time            time.Time
-	URL             url.URL
-	PtrStruct       *PtrStruct
-	UnmarshalText   Text
-	MapCustomKey    map[UUID]string
-	MapCustomKeyPtr map[*UUID]string
-	InterfaceStruct interface{}
-	Interface       interface{}
+	Bool              bool
+	Ptr               *string
+	Tag               string `formam:"tag"`
+	Time              time.Time
+	URL               url.URL
+	PtrStruct         *PtrStruct
+	UnmarshalText     Text
+	MapCustomKey      map[UUID]string
+	MapCustomKeyPtr   map[*UUID]string
+	InterfaceStruct   interface{}
+	Interface         interface{}
+	ArrayWithoutIndex []string
 }
 
 type InterfaceStruct struct {
@@ -102,6 +103,7 @@ var structValues = url.Values{
 	"InterfaceStruct.ID":                               []string{"1"},
 	"InterfaceStruct.Name":                             []string{"Go"},
 	"Interface":                                        []string{"only interface"},
+	"ArrayWithoutIndex":                                []string{"one", "two", "three", "go!"},
 }
 
 func TestDecodeInStruct(t *testing.T) {
