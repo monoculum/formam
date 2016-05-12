@@ -60,22 +60,22 @@ func Decode(vs url.Values, dst interface{}) error {
 		return fmt.Errorf("formam: the value passed for decode is not a pointer but a %v", main.Kind())
 	}
 
-	d := &decoder{main: main.Elem()}
+	dec := &decoder{main: main.Elem()}
 
-	// iterate over the form's values and decode it (except the maps, maps are decoded at the end)
+	// iterate over the form's values and decode it
 	for k, v := range vs {
-		d.path = k
-		d.field = k
-		d.values = v
-		d.value = v[0]
-		if d.value != "" {
-			if err := d.begin(); err != nil {
+		dec.path = k
+		dec.field = k
+		dec.values = v
+		dec.value = v[0]
+		if dec.value != "" {
+			if err := dec.begin(); err != nil {
 				return err
 			}
 		}
 	}
-	// decode maps
-	for _, v := range d.maps {
+	// set values of each maps
+	for _, v := range dec.maps {
 		key := v.m.Type().Key()
 		switch key.Kind() {
 		case reflect.String:
@@ -83,33 +83,33 @@ func Decode(vs url.Values, dst interface{}) error {
 			v.m.SetMapIndex(reflect.ValueOf(v.key), v.value)
 		default:
 			// must to implement the TextUnmarshaler interface for to can to decode the map's key
-			var vv reflect.Value
+			var val reflect.Value
 
 			if key.Kind() == reflect.Ptr {
-				vv = reflect.New(key.Elem())
+				val = reflect.New(key.Elem())
 			} else {
-				vv = reflect.New(key).Elem()
+				val = reflect.New(key).Elem()
 			}
 
-			d.value = v.key
-			if ok, err := d.unmarshalText(vv); !ok {
+			dec.value = v.key
+			if ok, err := dec.unmarshalText(val); !ok {
 				return fmt.Errorf("formam: the key with %s type (%v) in the path %v should implements the TextUnmarshaler interface for to can decode it", key, v.m.Type(), v.path)
 			} else if err != nil {
 				return fmt.Errorf("formam: an error has occured in the UnmarshalText method for type %s: %s", key, err)
 			}
 
-			v.m.SetMapIndex(vv, v.value)
+			v.m.SetMapIndex(val, v.value)
 		}
 	}
 
-	d.maps = []*pathMap{}
+	dec.maps = make(pathMaps, 0)
 	return nil
 }
 
 // begin prepare the current path to walk through it
-func (d *decoder) begin() (err error) {
-	d.curr = d.main
-	fields := strings.Split(d.field, ".")
+func (dec *decoder) begin() (err error) {
+	dec.curr = dec.main
+	fields := strings.Split(dec.field, ".")
 	for i, field := range fields {
 		b := strings.IndexAny(field, "[")
 		if b != -1 {
@@ -118,24 +118,24 @@ func (d *decoder) begin() (err error) {
 			if e == -1 {
 				return errors.New("formam: bad syntax array")
 			}
-			d.field = field[:b]
-			if d.index, err = strconv.Atoi(field[b+1 : e]); err != nil {
+			dec.field = field[:b]
+			if dec.index, err = strconv.Atoi(field[b+1 : e]); err != nil {
 				return errors.New("formam: the index of array is not a number")
 			}
 			if len(fields) == i+1 {
-				return d.end()
+				return dec.end()
 			}
-			if err = d.walk(); err != nil {
+			if err = dec.walk(); err != nil {
 				return
 			}
 		} else {
 			// not is a array
-			d.field = field
-			d.index = -1
+			dec.field = field
+			dec.index = -1
 			if len(fields) == i+1 {
-				return d.end()
+				return dec.end()
 			}
-			if err = d.walk(); err != nil {
+			if err = dec.walk(); err != nil {
 				return
 			}
 		}
@@ -144,139 +144,139 @@ func (d *decoder) begin() (err error) {
 }
 
 // walk traverses the current path until to the last field
-func (d *decoder) walk() error {
+func (dec *decoder) walk() error {
 	// check if is a struct or map
-	switch d.curr.Kind() {
+	switch dec.curr.Kind() {
 	case reflect.Struct:
-		if err := d.findStructField(); err != nil {
+		if err := dec.findStructField(); err != nil {
 			return err
 		}
 	case reflect.Map:
-		d.currentMap()
+		dec.currentMap()
 	}
 	// check if the struct or map is a interface
-	if d.curr.Kind() == reflect.Interface {
-		d.curr = d.curr.Elem()
+	if dec.curr.Kind() == reflect.Interface {
+		dec.curr = dec.curr.Elem()
 	}
 	// check if the struct or map is a pointer
-	if d.curr.Kind() == reflect.Ptr {
-		if d.curr.IsNil() {
-			d.curr.Set(reflect.New(d.curr.Type().Elem()))
+	if dec.curr.Kind() == reflect.Ptr {
+		if dec.curr.IsNil() {
+			dec.curr.Set(reflect.New(dec.curr.Type().Elem()))
 		}
-		d.curr = d.curr.Elem()
+		dec.curr = dec.curr.Elem()
 	}
 	// finally, check if there are access to slice/array or not...
-	if d.index != -1 {
-		switch d.curr.Kind() {
+	if dec.index != -1 {
+		switch dec.curr.Kind() {
 		case reflect.Slice, reflect.Array:
-			if d.curr.Len() <= d.index {
-				d.expandSlice(d.index + 1)
+			if dec.curr.Len() <= dec.index {
+				dec.expandSlice(dec.index + 1)
 			}
-			d.curr = d.curr.Index(d.index)
+			dec.curr = dec.curr.Index(dec.index)
 		default:
-			return fmt.Errorf("formam: the field \"%v\" in path \"%v\" has a index for array but it is not", d.field, d.path)
+			return fmt.Errorf("formam: the field \"%v\" in path \"%v\" has a index for array but it is not", dec.field, dec.path)
 		}
 	}
 	return nil
 }
 
 // end finds the last field for decode its value correspondent
-func (d *decoder) end() error {
-	if d.curr.Kind() == reflect.Struct {
-		if err := d.findStructField(); err != nil {
+func (dec *decoder) end() error {
+	if dec.curr.Kind() == reflect.Struct {
+		if err := dec.findStructField(); err != nil {
 			return err
 		}
 	}
-	if d.value == "" {
+	if dec.value == "" {
 		return nil
 	}
-	return d.decode()
+	return dec.decode()
 }
 
 // decode sets the value in the last field found by end function
-func (d *decoder) decode() error {
-	if ok, err := d.unmarshalText(d.curr); !ok && err != nil {
+func (dec *decoder) decode() error {
+	if ok, err := dec.unmarshalText(dec.curr); !ok && err != nil {
 		return err
 	}
 
-	switch d.curr.Kind() {
+	switch dec.curr.Kind() {
 	case reflect.Map:
-		d.currentMap()
-		return d.decode()
+		dec.currentMap()
+		return dec.decode()
 	case reflect.Slice, reflect.Array:
-		if d.index == -1 {
+		if dec.index == -1 {
 			// not has index, so to decode all values in the slice/array
-			d.expandSlice(len(d.values))
-			tmp := d.curr
-			for i, v := range d.values {
-				d.curr = tmp.Index(i)
-				d.value = v
-				if err := d.decode(); err != nil {
+			dec.expandSlice(len(dec.values))
+			tmp := dec.curr
+			for i, v := range dec.values {
+				dec.curr = tmp.Index(i)
+				dec.value = v
+				if err := dec.decode(); err != nil {
 					return err
 				}
 			}
 			return nil
 		}
 		// has index, so to decode value by index indicated
-		if d.curr.Len() <= d.index {
-			d.expandSlice(d.index + 1)
+		if dec.curr.Len() <= dec.index {
+			dec.expandSlice(dec.index + 1)
 		}
-		d.curr = d.curr.Index(d.index)
-		return d.decode()
+		dec.curr = dec.curr.Index(dec.index)
+		return dec.decode()
 	case reflect.String:
-		d.curr.SetString(d.value)
+		dec.curr.SetString(dec.value)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if num, err := strconv.ParseInt(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" should be a valid signed integer number", d.field, d.path)
+		if num, err := strconv.ParseInt(dec.value, 10, 64); err != nil {
+			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" should be a valid signed integer number", dec.field, dec.path)
 		} else {
-			d.curr.SetInt(num)
+			dec.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		if num, err := strconv.ParseUint(d.value, 10, 64); err != nil {
-			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" should be a valid unsigned integer number", d.field, d.path)
+		if num, err := strconv.ParseUint(dec.value, 10, 64); err != nil {
+			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" should be a valid unsigned integer number", dec.field, dec.path)
 		} else {
-			d.curr.SetUint(num)
+			dec.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
-		if num, err := strconv.ParseFloat(d.value, d.curr.Type().Bits()); err != nil {
-			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" should be a valid float number", d.field, d.path)
+		if num, err := strconv.ParseFloat(dec.value, dec.curr.Type().Bits()); err != nil {
+			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" should be a valid float number", dec.field, dec.path)
 		} else {
-			d.curr.SetFloat(num)
+			dec.curr.SetFloat(num)
 		}
 	case reflect.Bool:
-		switch d.value {
+		switch dec.value {
 		case "true", "on", "1":
-			d.curr.SetBool(true)
+			dec.curr.SetBool(true)
 		case "false", "off", "0":
-			d.curr.SetBool(false)
+			dec.curr.SetBool(false)
 		default:
-			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" is not a valid boolean", d.field, d.path)
+			return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" is not a valid boolean", dec.field, dec.path)
 		}
 	case reflect.Interface:
-		d.curr.Set(reflect.ValueOf(d.value))
+		dec.curr.Set(reflect.ValueOf(dec.value))
 	case reflect.Ptr:
-		d.curr.Set(reflect.New(d.curr.Type().Elem()))
-		d.curr = d.curr.Elem()
-		return d.decode()
+		dec.curr.Set(reflect.New(dec.curr.Type().Elem()))
+		dec.curr = dec.curr.Elem()
+		return dec.decode()
 	case reflect.Struct:
-		switch d.curr.Interface().(type) {
+		switch dec.curr.Interface().(type) {
 		case time.Time:
-			t, err := time.Parse("2006-01-02", d.value)
+			t, err := time.Parse("2006-01-02", dec.value)
 			if err != nil {
-				return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" is not a valid datetime", d.field, d.path)
+				return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" is not a valid datetime", dec.field, dec.path)
 			}
-			d.curr.Set(reflect.ValueOf(t))
+			dec.curr.Set(reflect.ValueOf(t))
 		case url.URL:
-			u, err := url.Parse(d.value)
+			u, err := url.Parse(dec.value)
 			if err != nil {
-				return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" is not a valid url", d.field, d.path)
+				return fmt.Errorf("formam: the value of field \"%v\" in path \"%v\" is not a valid url", dec.field, dec.path)
 			}
-			d.curr.Set(reflect.ValueOf(*u))
+			dec.curr.Set(reflect.ValueOf(*u))
 		default:
-			return fmt.Errorf("formam: not supported type for field \"%v\" in path \"%v\"", d.field, d.path)
+			return fmt.Errorf("formam: not supported type for field \"%v\" in path \"%v\"", dec.field, dec.path)
 		}
 	default:
-		return fmt.Errorf("formam: not supported type for field \"%v\" in path \"%v\"", d.field, d.path)
+		return fmt.Errorf("formam: not supported type for field \"%v\" in path \"%v\"", dec.field, dec.path)
 	}
 
 	return nil
@@ -284,65 +284,65 @@ func (d *decoder) decode() error {
 
 // findField finds a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
-func (d *decoder) findStructField() error {
+func (dec *decoder) findStructField() error {
 	var anon reflect.Value
 
-	num := d.curr.NumField()
+	num := dec.curr.NumField()
 	for i := 0; i < num; i++ {
-		field := d.curr.Type().Field(i)
-		if field.Name == d.field {
+		field := dec.curr.Type().Field(i)
+		if field.Name == dec.field {
 			// check if the field's name is equal
-			d.curr = d.curr.Field(i)
+			dec.curr = dec.curr.Field(i)
 			return nil
 		} else if field.Anonymous {
 			// if the field is a anonymous struct, then iterate over its fields
-			tmp := d.curr
-			d.curr = d.curr.FieldByIndex(field.Index)
-			if err := d.findStructField(); err != nil {
-				d.curr = tmp
+			tmp := dec.curr
+			dec.curr = dec.curr.FieldByIndex(field.Index)
+			if err := dec.findStructField(); err != nil {
+				dec.curr = tmp
 				continue
 			}
 			// field in anonymous struct is found,
 			// but first it should found the field in the rest of struct
 			// (a field with same name in the current struct should have preference over anonymous struct)
-			anon = d.curr
-			d.curr = tmp
-		} else if d.field == field.Tag.Get(TAG_NAME) {
+			anon = dec.curr
+			dec.curr = tmp
+		} else if dec.field == field.Tag.Get(TAG_NAME) {
 			// is not found yet, then retry by its tag name "formam"
-			d.curr = d.curr.Field(i)
+			dec.curr = dec.curr.Field(i)
 			return nil
 		}
 	}
 
 	if anon.IsValid() {
-		d.curr = anon
+		dec.curr = anon
 		return nil
 	}
 
-	return fmt.Errorf("formam: not found the field \"%v\" in the path \"%v\"", d.field, d.path)
+	return fmt.Errorf("formam: not found the field \"%v\" in the path \"%v\"", dec.field, dec.path)
 }
 
 // expandSlice expands the length and capacity of the current slice
-func (d *decoder) expandSlice(length int) {
-	sli := reflect.MakeSlice(d.curr.Type(), length, length)
-	reflect.Copy(sli, d.curr)
-	d.curr.Set(sli)
+func (dec *decoder) expandSlice(length int) {
+	n := reflect.MakeSlice(dec.curr.Type(), length, length)
+	reflect.Copy(n, dec.curr)
+	dec.curr.Set(n)
 }
 
 // currentMap gets in d.curr the map concrete for decode the current value
-func (d *decoder) currentMap() {
-	typ := d.curr.Type()
-	if d.curr.IsNil() {
-		d.curr.Set(reflect.MakeMap(typ))
-		v := reflect.New(typ.Elem()).Elem()
-		d.maps = append(d.maps, &pathMap{d.curr, d.field, v, d.path})
-		d.curr = v
-	} else if a := d.maps.find(d.curr, d.field); a == nil {
-		v := reflect.New(typ.Elem()).Elem()
-		d.maps = append(d.maps, &pathMap{d.curr, d.field, v, d.path})
-		d.curr = v
+func (dec *decoder) currentMap() {
+	n := dec.curr.Type()
+	if dec.curr.IsNil() {
+		dec.curr.Set(reflect.MakeMap(n))
+		m := reflect.New(n.Elem()).Elem()
+		dec.maps = append(dec.maps, &pathMap{dec.curr, dec.field, m, dec.path})
+		dec.curr = m
+	} else if a := dec.maps.find(dec.curr, dec.field); a == nil {
+		m := reflect.New(n.Elem()).Elem()
+		dec.maps = append(dec.maps, &pathMap{dec.curr, dec.field, m, dec.path})
+		dec.curr = m
 	} else {
-		d.curr = a.value
+		dec.curr = a.value
 	}
 }
 
@@ -353,21 +353,21 @@ var (
 
 // unmarshalText returns a boolean and error. The boolean is true if the
 // value implements TextUnmarshaler, and false if not.
-func (d *decoder) unmarshalText(v reflect.Value) (bool, error) {
+func (dec *decoder) unmarshalText(v reflect.Value) (bool, error) {
 	// skip if the type is time.Time
-	typ := v.Type()
-	if typ.ConvertibleTo(timeType) || typ.ConvertibleTo(timePType) {
+	n := v.Type()
+	if n.ConvertibleTo(timeType) || n.ConvertibleTo(timePType) {
 		return false, nil
 	}
 	// check if implements the interface
-	t, ok := v.Interface().(encoding.TextUnmarshaler)
-	canAddr := v.CanAddr()
-	if !ok && !canAddr {
+	m, ok := v.Interface().(encoding.TextUnmarshaler)
+	addr := v.CanAddr()
+	if !ok && !addr {
 		return false, nil
-	} else if canAddr {
-		return d.unmarshalText(v.Addr())
+	} else if addr {
+		return dec.unmarshalText(v.Addr())
 	}
 	// return result
-	err := t.UnmarshalText([]byte(d.value))
+	err := m.UnmarshalText([]byte(dec.value))
 	return true, err
 }
