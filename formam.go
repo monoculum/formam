@@ -42,16 +42,15 @@ func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
 type decoder struct {
 	main reflect.Value
 
-	curr reflect.Value
-	typ  reflect.Type
-
-	maps pathMaps
-
-	path   string
-	field  string
+	curr   reflect.Value
 	value  string
 	values []string
-	index  int
+
+	path  string
+	field string
+	index int
+
+	maps pathMaps
 }
 
 // Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
@@ -60,7 +59,10 @@ func Decode(vs url.Values, dst interface{}) error {
 	if main.Kind() != reflect.Ptr {
 		return fmt.Errorf("formam: the value passed for decode is not a pointer but a %v", main.Kind())
 	}
+
 	d := &decoder{main: main.Elem()}
+
+	// iterate over the form's values and decode it (except the maps, maps are decoded at the end)
 	for k, v := range vs {
 		d.path = k
 		d.field = k
@@ -72,6 +74,7 @@ func Decode(vs url.Values, dst interface{}) error {
 			}
 		}
 	}
+	// decode maps
 	for _, v := range d.maps {
 		key := v.m.Type().Key()
 		switch key.Kind() {
@@ -89,17 +92,16 @@ func Decode(vs url.Values, dst interface{}) error {
 			}
 
 			d.value = v.key
-			ok, err := d.unmarshalText(vv)
-			if !ok {
+			if ok, err := d.unmarshalText(vv); !ok {
 				return fmt.Errorf("formam: the key with %s type (%v) in the path %v should implements the TextUnmarshaler interface for to can decode it", key, v.m.Type(), v.path)
-			}
-			if err != nil {
+			} else if err != nil {
 				return fmt.Errorf("formam: an error has occured in the UnmarshalText method for type %s: %s", key, err)
 			}
 
 			v.m.SetMapIndex(vv, v.value)
 		}
 	}
+
 	d.maps = []*pathMap{}
 	return nil
 }
@@ -193,10 +195,7 @@ func (d *decoder) end() error {
 
 // decode sets the value in the last field found by end function
 func (d *decoder) decode() error {
-	ok, err := d.unmarshalText(d.curr)
-	if ok {
-		return err
-	} else if err != nil {
+	if ok, err := d.unmarshalText(d.curr); !ok && err != nil {
 		return err
 	}
 
