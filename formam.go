@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const TAG_NAME = "formam"
+const tagName = "formam"
 
 // A pathMap holds the values of a map with its key and values correspondent
 type pathMap struct {
@@ -307,7 +307,7 @@ func (dec *decoder) findStructField() error {
 			// (a field with same name in the current struct should have preference over anonymous struct)
 			anon = dec.curr
 			dec.curr = tmp
-		} else if dec.field == field.Tag.Get(TAG_NAME) {
+		} else if dec.field == field.Tag.Get(tagName) {
 			// is not found yet, then retry by its tag name "formam"
 			dec.curr = dec.curr.Field(i)
 			return nil
