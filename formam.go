@@ -195,7 +195,7 @@ func (dec *decoder) end() error {
 
 // decode sets the value in the last field found by end function
 func (dec *decoder) decode() error {
-	if ok, err := dec.unmarshalText(dec.curr); !ok && err != nil {
+	if ok, err := dec.unmarshalText(dec.curr); ok || err != nil {
 		return err
 	}
 
@@ -205,6 +205,7 @@ func (dec *decoder) decode() error {
 		return dec.decode()
 	case reflect.Slice, reflect.Array:
 		if dec.index == -1 {
+			fmt.Println("INDEX", dec.index, dec.field, dec.path, dec.curr.Kind(), dec.curr.Type())
 			// not has index, so to decode all values in the slice/array
 			dec.expandSlice(len(dec.values))
 			tmp := dec.curr
@@ -215,14 +216,14 @@ func (dec *decoder) decode() error {
 					return err
 				}
 			}
-			return nil
+		} else {
+			// has index, so to decode value by index indicated
+			if dec.curr.Len() <= dec.index {
+				dec.expandSlice(dec.index + 1)
+			}
+			dec.curr = dec.curr.Index(dec.index)
+			return dec.decode()
 		}
-		// has index, so to decode value by index indicated
-		if dec.curr.Len() <= dec.index {
-			dec.expandSlice(dec.index + 1)
-		}
-		dec.curr = dec.curr.Index(dec.index)
-		return dec.decode()
 	case reflect.String:
 		dec.curr.SetString(dec.value)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
