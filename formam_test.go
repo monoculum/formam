@@ -64,6 +64,7 @@ type TestStruct struct {
 	UnmarshalText     Text
 	MapCustomKey      map[UUID]string
 	MapCustomKeyPtr   map[*UUID]string
+	UUID              UUID
 	InterfaceStruct   interface{}
 	Interface         interface{}
 	ArrayWithoutIndex []string
@@ -100,10 +101,11 @@ var structValues = url.Values{
 	"UnmarshalText":                                    []string{"unmarshal text"},
 	"MapCustomKey.11e5bf2d3e403a8c86740023dffe5350":    []string{"Princess Mononoke"},
 	"MapCustomKeyPtr.11e5bf2d3e403a8c86740023dffe5350": []string{"*Princess Mononoke"},
-	"InterfaceStruct.ID":                               []string{"1"},
-	"InterfaceStruct.Name":                             []string{"Go"},
-	"Interface":                                        []string{"only interface"},
-	"ArrayWithoutIndex":                                []string{"one", "two", "three", "go!"},
+	"UUID":                 []string{"11e5bf2d3e403a8c86740023dffe5350"},
+	"InterfaceStruct.ID":   []string{"1"},
+	"InterfaceStruct.Name": []string{"Go"},
+	"Interface":            []string{"only interface"},
+	"ArrayWithoutIndex":    []string{"one", "two", "three", "go!"},
 }
 
 func TestDecodeInStruct(t *testing.T) {
