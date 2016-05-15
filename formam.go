@@ -205,7 +205,6 @@ func (dec *decoder) decode() error {
 		return dec.decode()
 	case reflect.Slice, reflect.Array:
 		if dec.index == -1 {
-			fmt.Println("INDEX", dec.index, dec.field, dec.path, dec.curr.Kind(), dec.curr.Type())
 			// not has index, so to decode all values in the slice/array
 			dec.expandSlice(len(dec.values))
 			tmp := dec.curr
