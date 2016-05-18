@@ -3,7 +3,6 @@ package formam
 
 import (
 	"encoding"
-	"errors"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -116,11 +115,11 @@ func (dec *decoder) begin() (err error) {
 			// is a array
 			e := strings.IndexAny(field, "]")
 			if e == -1 {
-				return errors.New("formam: bad syntax array")
+				return fmt.Errorf("formam: bad syntax array in the field \"%v\" of path \"%v\"", dec.field, dec.path)
 			}
 			dec.field = field[:b]
 			if dec.index, err = strconv.Atoi(field[b+1 : e]); err != nil {
-				return errors.New("formam: the index of array is not a number")
+				return fmt.Errorf("formam: the index of array is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path)
 			}
 			if len(fields) == i+1 {
 				return dec.end()
