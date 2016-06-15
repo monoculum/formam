@@ -353,11 +353,6 @@ var (
 // unmarshalText returns a boolean and error. The boolean is true if the
 // value implements TextUnmarshaler, and false if not.
 func (dec *decoder) unmarshalText(v reflect.Value) (bool, error) {
-	// skip if the type is time.Time
-	n := v.Type()
-	if n.ConvertibleTo(timeType) || n.ConvertibleTo(timePType) {
-		return false, nil
-	}
 	// check if implements the interface
 	m, ok := v.Interface().(encoding.TextUnmarshaler)
 	addr := v.CanAddr()
@@ -365,6 +360,11 @@ func (dec *decoder) unmarshalText(v reflect.Value) (bool, error) {
 		return false, nil
 	} else if addr {
 		return dec.unmarshalText(v.Addr())
+	}
+	// skip if the type is time.Time
+	n := v.Type()
+	if n.ConvertibleTo(timeType) || n.ConvertibleTo(timePType) {
+		return false, nil
 	}
 	// return result
 	err := m.UnmarshalText([]byte(dec.value))
