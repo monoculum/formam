@@ -48,7 +48,7 @@ Usage
 ### In form html
 
 - Use symbol `.` for access a field/key of a structure or map. (i.e, `struct.key`)
-- Use `[int_here]` for access to index of a slice/array. (i.e, `struct.array[0]`)
+- Use `[int_here]` for access to index of a slice/array. (i.e, `struct.array[0]`). If the array/slice is the last field of the path, it is not necessary to indicate the index
 
 ```html
 <form method="POST">
