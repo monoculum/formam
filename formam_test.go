@@ -68,6 +68,10 @@ type TestStruct struct {
 	InterfaceStruct   interface{}
 	Interface         interface{}
 	ArrayWithoutIndex []string
+	MapWithIntKey     map[int]string
+	MapWithUIntKey    map[uint]string
+	//MapWithFloatKey   map[float32]string
+	MapWithBooleanKey map[bool]string
 }
 
 type InterfaceStruct struct {
@@ -101,11 +105,15 @@ var structValues = url.Values{
 	"UnmarshalText":                                    []string{"unmarshal text"},
 	"MapCustomKey.11e5bf2d3e403a8c86740023dffe5350":    []string{"Princess Mononoke"},
 	"MapCustomKeyPtr.11e5bf2d3e403a8c86740023dffe5350": []string{"*Princess Mononoke"},
-	"UUID":                 []string{"11e5bf2d3e403a8c86740023dffe5350"},
-	"InterfaceStruct.ID":   []string{"1"},
-	"InterfaceStruct.Name": []string{"Go"},
-	"Interface":            []string{"only interface"},
-	"ArrayWithoutIndex":    []string{"one", "two", "three", "go!"},
+	"UUID":                   []string{"11e5bf2d3e403a8c86740023dffe5350"},
+	"InterfaceStruct.ID":     []string{"1"},
+	"InterfaceStruct.Name":   []string{"Go"},
+	"Interface":              []string{"only interface"},
+	"ArrayWithoutIndex":      []string{"one", "two", "three", "go!"},
+	"MapWithIntKey.-2":       []string{"value that belongs to int key"},
+	"MapWithUIntKey.10":      []string{"value that belongs to int key"},
+	//"MapWithFloatKey.2,2":    []string{"value that belongs to int key"},
+	"MapWithBooleanKey.true": []string{"value that belongs to int key"},
 }
 
 func TestDecodeInStruct(t *testing.T) {

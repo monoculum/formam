@@ -58,7 +58,6 @@ func Decode(vs url.Values, dst interface{}) error {
 	if main.Kind() != reflect.Ptr {
 		return fmt.Errorf("formam: the value passed for decode is not a pointer but a %v", main.Kind())
 	}
-
 	dec := &decoder{main: main.Elem()}
 
 	// iterate over the form's values and decode it
@@ -73,31 +72,93 @@ func Decode(vs url.Values, dst interface{}) error {
 			}
 		}
 	}
+
 	// set values of each maps
 	for _, v := range dec.maps {
-		key := v.m.Type().Key()
+		typ := v.m.Type()
+		key := typ.Key()
+
+		// check if the key implements the UnmarshalText interface
+		var val reflect.Value
+		if key.Kind() == reflect.Ptr {
+			val = reflect.New(key.Elem())
+		} else {
+			val = reflect.New(key).Elem()
+		}
+		dec.value = v.key
+		ok, err := dec.unmarshalText(val)
+		if ok {
+			v.m.SetMapIndex(val, v.value)
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		// if the key not implements the UnmarahalText interface then...
 		switch key.Kind() {
 		case reflect.String:
-			// the key is a string
 			v.m.SetMapIndex(reflect.ValueOf(v.key), v.value)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			num, err := strconv.ParseInt(v.key, 10, 64)
+			if err != nil {
+				return fmt.Errorf("formam: the key's value \"%v\" in path \"%v\" is not a valid signed integer number", v.key, v.path)
+			}
+			switch key.Kind() {
+			case reflect.Int:
+				v.m.SetMapIndex(reflect.ValueOf(int(num)), v.value)
+			case reflect.Int8:
+				v.m.SetMapIndex(reflect.ValueOf(int8(num)), v.value)
+			case reflect.Int16:
+				v.m.SetMapIndex(reflect.ValueOf(int16(num)), v.value)
+			case reflect.Int32:
+				v.m.SetMapIndex(reflect.ValueOf(int32(num)), v.value)
+			case reflect.Int64:
+				v.m.SetMapIndex(reflect.ValueOf(int64(num)), v.value)
+			}
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+			num, err := strconv.ParseUint(v.key, 10, 64)
+			if err != nil {
+				return fmt.Errorf("formam: the key's value \"%v\" in path \"%v\" is not a valid unsigned integer number", v.key, v.path)
+			}
+			switch key.Kind() {
+			case reflect.Uint:
+				v.m.SetMapIndex(reflect.ValueOf(uint(num)), v.value)
+			case reflect.Uint8:
+				v.m.SetMapIndex(reflect.ValueOf(uint8(num)), v.value)
+			case reflect.Uint16:
+				v.m.SetMapIndex(reflect.ValueOf(uint16(num)), v.value)
+			case reflect.Uint32:
+				v.m.SetMapIndex(reflect.ValueOf(uint32(num)), v.value)
+			case reflect.Uint64:
+				v.m.SetMapIndex(reflect.ValueOf(uint64(num)), v.value)
+			}
+			/*
+				case reflect.Float32, reflect.Float64:
+					dec.value = strings.Replace(dec.value, ",", ".", -1)
+					num, err := strconv.ParseFloat(dec.value, key.Bits())
+					if err != nil {
+						return fmt.Errorf("formam: the key's value \"%v\" in path \"%v\" is not a valid float number", v.key, v.path)
+					}
+					switch key.Kind() {
+					case reflect.Float32:
+						v.m.SetMapIndex(reflect.ValueOf(float32(num)), v.value)
+					case reflect.Float64:
+						v.m.SetMapIndex(reflect.ValueOf(float64(num)), v.value)
+					}
+			*/
+		case reflect.Bool:
+			switch dec.value {
+			case "true", "on", "1":
+				v.m.SetMapIndex(reflect.ValueOf(true), v.value)
+			case "false", "off", "0":
+				v.m.SetMapIndex(reflect.ValueOf(false), v.value)
+			default:
+				return fmt.Errorf("formam: the key's value \"%v\" in path \"%v\" is not a valid boolean", v.value, v.path)
+			}
+		case reflect.Array:
+			return fmt.Errorf("formam: the type Array is not implemented yet for key in maps...")
 		default:
-			// must to implement the TextUnmarshaler interface for to can to decode the map's key
-			var val reflect.Value
-
-			if key.Kind() == reflect.Ptr {
-				val = reflect.New(key.Elem())
-			} else {
-				val = reflect.New(key).Elem()
-			}
-
-			dec.value = v.key
-			if ok, err := dec.unmarshalText(val); !ok {
-				return fmt.Errorf("formam: the key with %s type (%v) in the path %v should implements the TextUnmarshaler interface for to can decode it", key, v.m.Type(), v.path)
-			} else if err != nil {
-				return fmt.Errorf("formam: an error has occured in the UnmarshalText method for type %s: %s", key, err)
-			}
-
-			v.m.SetMapIndex(val, v.value)
+			return fmt.Errorf("formam: the key's type \"%v\" in path \"%v\" is not a valid type", key.Kind().String(), v.path)
 		}
 	}
 
@@ -367,6 +428,5 @@ func (dec *decoder) unmarshalText(v reflect.Value) (bool, error) {
 		return false, nil
 	}
 	// return result
-	err := m.UnmarshalText([]byte(dec.value))
-	return true, err
+	return true, m.UnmarshalText([]byte(dec.value))
 }
