@@ -1,7 +1,8 @@
 formam
 ======
 
-a package for decode form's values into struct in Go. The only requirement is [Go 1.2](http://golang.org/doc/go1.2) or later.
+A package for decode form's values into struct in Go. 
+The only requirement is [Go 1.2](http://golang.org/doc/go1.2) or later.
 
 [![Build Status](https://travis-ci.org/monoculum/formam.png?branch=master)](https://travis-ci.org/monoculum/formam)
 [![GoDoc](https://godoc.org/github.com/monoculum/formam?status.png)](https://godoc.org/github.com/monoculum/formam)
