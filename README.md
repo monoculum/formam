@@ -1,7 +1,7 @@
 formam
 ======
 
-a package for decode form's values into struct in Go
+a package for decode form's values into struct in Go. The only requirement is [Go 1.2](http://golang.org/doc/go1.2) or later.
 
 [![Build Status](https://travis-ci.org/monoculum/formam.png?branch=master)](https://travis-ci.org/monoculum/formam)
 [![GoDoc](https://godoc.org/github.com/monoculum/formam?status.png)](https://godoc.org/github.com/monoculum/formam)
@@ -17,10 +17,6 @@ Features
 * decode `url.URL`
 * The `slice` and `array` is possible to access without to indicate a index (If it is the last field, of course)`
 ``
-Dependencies
-------------
-
-The only requirement is [Go 1.2](http://golang.org/doc/go1.2) or later.
 
 Performance
 -----------
