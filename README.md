@@ -6,6 +6,17 @@ a package for decode form's values into struct in Go
 [![Build Status](https://travis-ci.org/monoculum/formam.png?branch=master)](https://travis-ci.org/monoculum/formam)
 [![GoDoc](https://godoc.org/github.com/monoculum/formam?status.png)](https://godoc.org/github.com/monoculum/formam)
 
+Features
+--------
+
+. Nesting ad infinitum in `maps`, `structs` and `slices`.
+. `UnmarshalText` in values and keys of maps.
+. the key of map supported are: string, int and variants, uint and variants, uintptr, float32, float64 and bool
+. A field with `interface{}` that has a `map`, `struct` or `slice` as value is perfectly possible access to them! (see example below)
+. decode `time.Time` with format "2006-01-02"
+. decode `url.URL`
+. The `slice` and `array` is possible to access without to indicate a index (If it is the last field, of course)`
+``
 Dependencies
 ------------
 
@@ -42,13 +53,21 @@ Custom Marshaling
 
 Is possible unmarshaling data and the key of a map by the `encoding.TextUnmarshaler` interface.
 
+Notes
+-----
+
+The version 2 is compatible with old syntax for to access to maps, i.e., by point.
+If you is using this package for first time in your project, please, use the brackets for to access to maps.
+
+
 Usage
 -----
 
 ### In form html
 
-- Use symbol `.` for access a field/key of a structure or map. (i.e, `struct.key`)
-- Use `[int_here]` for access to index of a slice/array. (i.e, `struct.array[0]`). If the array/slice is the last field of the path, it is not necessary to indicate the index
+- Use symbol `.` for access a field of a struct. (i.e, `struct.field1`)
+- Use `[<index>]` for access to index of a slice/array. (i.e, `struct.array[0]`). If the array/slice is the last field of the path, it is not necessary to indicate the index
+- Use `[<key>]` for access to key of a map. (i.e, `struct.map[es-ES]`).
 
 ```html
 <form method="POST">
