@@ -9,13 +9,13 @@ a package for decode form's values into struct in Go
 Features
 --------
 
-. Nesting ad infinitum in `maps`, `structs` and `slices`.
-. `UnmarshalText` in values and keys of maps.
-. the key of map supported are: string, int and variants, uint and variants, uintptr, float32, float64 and bool
-. A field with `interface{}` that has a `map`, `struct` or `slice` as value is perfectly possible access to them! (see example below)
-. decode `time.Time` with format "2006-01-02"
-. decode `url.URL`
-. The `slice` and `array` is possible to access without to indicate a index (If it is the last field, of course)`
+* Nesting ad infinitum in `maps`, `structs` and `slices`.
+* `UnmarshalText` in values and keys of maps.
+* the key of map supported are: string, int and variants, uint and variants, uintptr, float32, float64 and bool
+* A field with `interface{}` that has a `map`, `struct` or `slice` as value is perfectly possible access to them! (see example below)
+* decode `time.Time` with format "2006-01-02"
+* decode `url.URL`
+* The `slice` and `array` is possible to access without to indicate a index (If it is the last field, of course)`
 ``
 Dependencies
 ------------
