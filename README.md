@@ -12,7 +12,7 @@ Features
 
 * Nesting ad infinitum in `maps`, `structs` and `slices`.
 * `UnmarshalText` in values and keys of maps.
-* the key of map supported are: string, int and variants, uint and variants, uintptr, float32, float64 and bool
+* the `map`'s key supported are: `string`, `int` and variants, `uint` and variants, `uintptr`, `float32`, `float64`, `bool`, `struct` and `custom types` to one of the above types registered by function or `UnmarshalText` method
 * A field with `interface{}` that has a `map`, `struct` or `slice` as value is perfectly possible access to them! (see example below)
 * decode `time.Time` with format "2006-01-02"
 * decode `url.URL`
