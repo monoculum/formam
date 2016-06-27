@@ -53,7 +53,7 @@ Is possible unmarshaling data and the key of a map by the `encoding.TextUnmarsha
 Custom Type
 -----------
 
-Is possible to register a function for a custom type. Type registered has preference over UnmarshalText method. For example:
+Is possible to register a function for a custom type. Types registered has preference over UnmarshalText method. For example:
 
 ```go
 decoder.RegisterCustomType(func(vals []string) (interface{}, error) {
