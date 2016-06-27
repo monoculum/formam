@@ -17,6 +17,7 @@ Features
 * decode `time.Time` with format "2006-01-02"
 * decode `url.URL`
 * The `slice` and `array` is possible to access without to indicate a index (If it is the last field, of course)`
+* You can to register a `func` for a `custom type`
 ``
 
 Performance
@@ -49,6 +50,17 @@ Custom Marshaling
 -----------------
 
 Is possible unmarshaling data and the key of a map by the `encoding.TextUnmarshaler` interface.
+
+Custom Type
+-----------
+
+Is possible to register a function for a custom type. For example:
+
+```go
+decoder.RegisterCustomType(func(vals []string) (interface{}, error) {
+        return time.Parse("2006-01-02", vals[0])
+    }, time.Time{})
+```
 
 Notes
 -----

@@ -33,10 +33,14 @@ func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
 	return nil
 }
 
-// A decoder holds the values from form, the 'reflect' value of main struct
-// and the 'reflect' value of current path
-type decoder struct {
-	main reflect.Value
+// DecodeCustomTypeFunc is a function that indicate how should to decode a custom type
+type DecodeCustomTypeFunc func([]string) (interface{}, error)
+
+// Decoder the main to decode the values
+type Decoder struct {
+	main       reflect.Value
+	formValues url.Values
+	opts       *DecoderOptions
 
 	curr   reflect.Value
 	value  string
@@ -48,6 +52,47 @@ type decoder struct {
 	isKey   bool
 
 	maps pathMaps
+
+	customTypes map[reflect.Type]DecodeCustomTypeFunc
+}
+
+// DecoderOptions options for decoding the values
+type DecoderOptions struct {
+	TagName string
+}
+
+// RegisterCustomType It is the method responsible for register functions for decoding custom types
+func (dec *Decoder) RegisterCustomType(fn DecodeCustomTypeFunc, types ...interface{}) *Decoder {
+	if dec.customTypes == nil {
+		dec.customTypes = make(map[reflect.Type]DecodeCustomTypeFunc)
+	}
+	for i := range types {
+		dec.customTypes[reflect.TypeOf(types[i])] = fn
+	}
+	return dec
+}
+
+// NewDecoder creates a new instance of Decoder
+func NewDecoder(opts *DecoderOptions) *Decoder {
+	dec := &Decoder{opts: opts}
+	if dec.opts == nil {
+		dec.opts = &DecoderOptions{}
+	}
+	if dec.opts.TagName == "" {
+		dec.opts.TagName = tagName
+	}
+	return dec
+}
+
+// Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
+func (dec *Decoder) Decode(vs url.Values, dst interface{}) error {
+	main := reflect.ValueOf(dst)
+	if main.Kind() != reflect.Ptr {
+		return newError(fmt.Errorf("formam: the value passed for decode is not a pointer but a %v", main.Kind()))
+	}
+	dec.main = main.Elem()
+	dec.formValues = vs
+	return dec.prepare()
 }
 
 // Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
@@ -56,9 +101,19 @@ func Decode(vs url.Values, dst interface{}) error {
 	if main.Kind() != reflect.Ptr {
 		return newError(fmt.Errorf("formam: the value passed for decode is not a pointer but a %v", main.Kind()))
 	}
-	dec := &decoder{main: main.Elem()}
+	dec := &Decoder{
+		main:       main.Elem(),
+		formValues: vs,
+		opts: &DecoderOptions{
+			TagName: tagName,
+		},
+	}
+	return dec.prepare()
+}
+
+func (dec *Decoder) prepare() error {
 	// iterate over the form's values and decode it
-	for k, v := range vs {
+	for k, v := range dec.formValues {
 		dec.path = k
 		dec.field = k
 		dec.values = v
@@ -94,8 +149,8 @@ func Decode(vs url.Values, dst interface{}) error {
 	return nil
 }
 
-// begin prepare the current path to walk through it
-func (dec *decoder) begin() (err error) {
+// begin analyzes the current path to walk through it
+func (dec *Decoder) begin() (err error) {
 	inBracket := false
 	valBracket := ""
 	bracketClosed := false
@@ -167,7 +222,7 @@ func (dec *decoder) begin() (err error) {
 }
 
 // walk traverses the current path until to the last field
-func (dec *decoder) walk() error {
+func (dec *Decoder) walk() error {
 	// check if there is field, if is so, then it should be struct or map (access by .)
 	if dec.field != "" {
 		// check if is a struct or map
@@ -222,7 +277,7 @@ func (dec *decoder) walk() error {
 }
 
 // walkMap puts in d.curr the map concrete for decode the current value
-func (dec *decoder) walkInMap(key string) {
+func (dec *Decoder) walkInMap(key string) {
 	n := dec.curr.Type()
 	takeAndAppend := func() {
 		m := reflect.New(n.Elem()).Elem()
@@ -240,7 +295,7 @@ func (dec *decoder) walkInMap(key string) {
 }
 
 // end finds the last field for decode its value correspondent
-func (dec *decoder) end() error {
+func (dec *Decoder) end() error {
 	switch dec.curr.Kind() {
 	case reflect.Struct:
 		if err := dec.findStructField(); err != nil {
@@ -257,9 +312,13 @@ func (dec *decoder) end() error {
 }
 
 // decode sets the value in the field
-func (dec *decoder) decode() error {
+func (dec *Decoder) decode() error {
+	// has registered a custom type? If so, then decode by it
+	if ok, err := dec.checkCustomType(); ok || err != nil {
+		return err
+	}
 	// implements UnmarshalText interface? If so, then decode by it
-	if ok, err := unmarshalText(dec.curr, dec.value); ok || err != nil {
+	if ok, err := checkUnmarshalText(dec.curr, dec.value); ok || err != nil {
 		return err
 	}
 
@@ -358,10 +417,17 @@ func (dec *decoder) decode() error {
 			}
 			dec.curr.Set(reflect.ValueOf(*u))
 		default:
-			if dec.isKey {
-				dec.field = dec.value
-				return dec.begin()
-			}
+			/*
+				if dec.isKey {
+					tmp := dec.curr
+					dec.field = dec.value
+					if err := dec.begin(); err != nil {
+						return err
+					}
+					dec.curr = tmp
+					return nil
+				}
+			*/
 			return newError(fmt.Errorf("formam: not supported type for field \"%v\" in path \"%v\"", dec.field, dec.path))
 		}
 	default:
@@ -373,7 +439,7 @@ func (dec *decoder) decode() error {
 
 // findField finds a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
-func (dec *decoder) findStructField() error {
+func (dec *Decoder) findStructField() error {
 	var anon reflect.Value
 
 	num := dec.curr.NumField()
@@ -396,7 +462,7 @@ func (dec *decoder) findStructField() error {
 			// (a field with same name in the current struct should have preference over anonymous struct)
 			anon = dec.curr
 			dec.curr = tmp
-		} else if dec.field == field.Tag.Get(tagName) {
+		} else if dec.field == field.Tag.Get(dec.opts.TagName) {
 			// is not found yet, then retry by its tag name "formam"
 			dec.curr = dec.curr.Field(i)
 			return nil
@@ -411,8 +477,24 @@ func (dec *decoder) findStructField() error {
 }
 
 // expandSlice expands the length and capacity of the current slice
-func (dec *decoder) expandSlice(length int) {
+func (dec *Decoder) expandSlice(length int) {
 	n := reflect.MakeSlice(dec.curr.Type(), length, length)
 	reflect.Copy(n, dec.curr)
 	dec.curr.Set(n)
+}
+
+// checkCustomType checks if the value to decode has a custom type registered
+func (dec *Decoder) checkCustomType() (bool, error) {
+	if dec.customTypes == nil {
+		return false, nil
+	}
+	if v, ok := dec.customTypes[dec.curr.Type()]; ok {
+		va, err := v(dec.values)
+		if err != nil {
+			return true, err
+		}
+		dec.curr.Set(reflect.ValueOf(va))
+		return true, nil
+	}
+	return false, nil
 }

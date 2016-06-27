@@ -43,6 +43,8 @@ type Anonymous struct {
 	FieldOverride  string
 }
 
+type FieldString string
+
 type TestStruct struct {
 	Anonymous
 	FieldOverride string
@@ -141,6 +143,9 @@ type TestStruct struct {
 	Interface interface{}
 	// interface with struct as data
 	InterfaceStruct interface{}
+
+	// custom type
+	CustomType FieldString
 }
 
 type InterfaceStruct struct {
@@ -231,12 +236,19 @@ var vals = url.Values{
 	"Interface":            []string{"Germany"},
 	"InterfaceStruct.ID":   []string{"1"},
 	"InterfaceStruct.Name": []string{"Germany"},
+
+	// custom type
+	"CustomType": []string{"if you see this text, then it's a bug"},
 }
 
 func TestDecodeInStruct(t *testing.T) {
 	var m TestStruct
 	m.InterfaceStruct = &InterfaceStruct{}
-	err := Decode(vals, &m)
+
+	dec := NewDecoder(nil).RegisterCustomType(func(vals []string) (interface{}, error) {
+		return FieldString("value changed by custom type"), nil
+	}, FieldString(""))
+	err := dec.Decode(vals, &m)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -554,6 +566,9 @@ func TestDecodeInStruct(t *testing.T) {
 		if v.Name == "" {
 			t.Error("The value of InterfaceStruct.Name is empty")
 		}
+	}
+	if m.CustomType != "value changed by custom type" {
+		t.Error("The value of CustomType is not correct")
 	}
 
 	fmt.Println("RESULT: ", m)
