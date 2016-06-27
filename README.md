@@ -132,7 +132,7 @@ func MyHandler(w http.ResponseWriter, r *http.Request) error {
       Interface: &InterfaceStruct{},
   }
   r.ParseForm()
-  dec := formam.NewDecoder(&formam.DecoderOptions{TagName: "form"})
+  dec := formam.NewDecoder(&formam.DecoderOptions{TagName: "formam"})
   if err := dec.Decode(r.Form, &m); err != nil {
   		return err
   }
