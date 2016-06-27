@@ -118,6 +118,11 @@ type TestStruct struct {
 	MapWithCustomKey map[UUID]string
 	// map with custom key pointer and decode key by unmarshal key
 	MapWithCustomKeyPointer map[*UUID]string
+	// map with time.Time Key
+	MapWithStruct1Key map[time.Time]string
+	// map with url.URL Key
+	MapWithStruct2Key map[url.URL]string
+	//MapWithStruct3Key map[struct {ID struct {ID string}]string
 
 	// unmarshal text
 	UnmarshalTextString Text
@@ -205,6 +210,9 @@ var vals = url.Values{
 	"MapWithBooleanKey[true]":                                   []string{"bool key in map"},
 	"MapWithCustomKey[11e5bf2d3e403a8c86740023dffe5350]":        []string{"UUID key in map"},
 	"MapWithCustomKeyPointer[11e5bf2d3e403a8c86740023dffe5350]": []string{"UUID key pointer in map"},
+	"MapWithStruct1Key[2006-01-02]":                             []string{"time.Time key in map"},
+	"MapWithStruct2Key[http://www.monoculum.com]":               []string{"url.URL key in map"},
+	//"MapWithStruct3Key[ID.ID]":                                  []string{"struct key in map"},
 
 	// unmarshal text
 	"UnmarshalTextString": []string{"If you see this text, then it's a bug"},
@@ -217,7 +225,7 @@ var vals = url.Values{
 	"Time": []string{"2016-06-12"},
 
 	// url
-	"URL": []string{"http://www.google.com"},
+	"URL": []string{"http://www.monoculum.com"},
 
 	// interface
 	"Interface":            []string{"Germany"},
@@ -494,6 +502,22 @@ func TestDecodeInStruct(t *testing.T) {
 			t.Error("The key in MapWithCustomKeyPointer is not 11e5bf2d3e403a8c86740023dffe5350")
 		} else if v == "" {
 			t.Error("The value of MapWithCustomKeyPointer[11e5bf2d3e403a8c86740023dffe5350] is empty")
+		}
+	}
+	for k, v := range m.MapWithStruct1Key {
+		if k.IsZero() {
+			t.Error("The key of MapWithStruct1Key is zero")
+		}
+		if v == "" {
+			t.Error("The value of MapWithStruct1Key[time.Time] is empty")
+		}
+	}
+	for k, v := range m.MapWithStruct2Key {
+		if k.String() == "" {
+			t.Error("The key of MapWithStruct2Key is empty")
+		}
+		if v == "" {
+			t.Error("The value of MapWithStruct2Key[ur.URL] is empty")
 		}
 	}
 

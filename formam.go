@@ -13,8 +13,7 @@ const tagName = "formam"
 
 // A pathMap holds the values of a map with its key and values correspondent
 type pathMap struct {
-	m reflect.Value
-
+	ma    reflect.Value
 	key   string
 	value reflect.Value
 
@@ -27,7 +26,7 @@ type pathMaps []*pathMap
 // find find and get the value by the given key
 func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
 	for _, v := range ma {
-		if v.m == id && v.key == key {
+		if v.ma == id && v.key == key {
 			return v
 		}
 	}
@@ -43,9 +42,10 @@ type decoder struct {
 	value  string
 	values []string
 
-	path  string
-	field string
-	key   string
+	path    string
+	field   string
+	bracket string
+	isKey   bool
 
 	maps pathMaps
 }
@@ -72,7 +72,7 @@ func Decode(vs url.Values, dst interface{}) error {
 	}
 	// set values of maps
 	for _, v := range dec.maps {
-		key := v.m.Type().Key()
+		key := v.ma.Type().Key()
 		// check if the key implements the UnmarshalText interface
 		var val reflect.Value
 		if key.Kind() == reflect.Ptr {
@@ -83,11 +83,12 @@ func Decode(vs url.Values, dst interface{}) error {
 		// decode key
 		dec.curr = val
 		dec.value = v.key
+		dec.isKey = true
 		if err := dec.decode(); err != nil {
 			return err
 		}
 		// set key with its value
-		v.m.SetMapIndex(dec.curr, v.value)
+		v.ma.SetMapIndex(dec.curr, v.value)
 	}
 	dec.maps = make(pathMaps, 0)
 	return nil
@@ -103,7 +104,7 @@ func (dec *decoder) begin() (err error) {
 
 	// parse path
 	for i, char := range tmp {
-		if char == '[' {
+		if char == '[' && inBracket == false {
 			// found an opening bracket
 			bracketClosed = false
 			inBracket = true
@@ -115,11 +116,21 @@ func (dec *decoder) begin() (err error) {
 		} else if inBracket {
 			// it is inside of bracket, so get its value
 			if char == ']' {
+				/*
+					nextChar := tmp[i+1:]
+					if nextChar != "" {
+						t := nextChar[:1]
+						if t != "[" && t != "." {
+							valBracket += string(char)
+							continue
+						}
+					}
+				*/
 				// found an closing bracket, so it will be recently close, so put as true the bracketClosed
 				// and put as false inBracket and pass the value of bracket to dec.key
 				inBracket = false
 				bracketClosed = true
-				dec.key = valBracket
+				dec.bracket = valBracket
 				lastPos = i + 1
 				if err = dec.walk(); err != nil {
 					return
@@ -182,16 +193,16 @@ func (dec *decoder) walk() error {
 		dec.curr = dec.curr.Elem()
 	}
 	// check if there is access to slice/array or map (access by [])
-	if dec.key != "" {
+	if dec.bracket != "" {
 		switch dec.curr.Kind() {
 		case reflect.Array:
-			index, err := strconv.Atoi(dec.key)
+			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
 				return newError(fmt.Errorf("formam: the index of array is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
 			}
 			dec.curr = dec.curr.Index(index)
 		case reflect.Slice:
-			index, err := strconv.Atoi(dec.key)
+			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
 				return newError(fmt.Errorf("formam: the index of slice is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
 			}
@@ -200,13 +211,13 @@ func (dec *decoder) walk() error {
 			}
 			dec.curr = dec.curr.Index(index)
 		case reflect.Map:
-			dec.walkInMap(dec.key)
+			dec.walkInMap(dec.bracket)
 		default:
 			return newError(fmt.Errorf("formam: the field \"%v\" in path \"%v\" has a index for array but it is a %v", dec.field, dec.path, dec.curr.Kind()))
 		}
 	}
 	dec.field = ""
-	dec.key = ""
+	dec.bracket = ""
 	return nil
 }
 
@@ -254,7 +265,7 @@ func (dec *decoder) decode() error {
 
 	switch dec.curr.Kind() {
 	case reflect.Array:
-		if dec.key == "" {
+		if dec.bracket == "" {
 			// not has index, so to decode all values in the array
 			tmp := dec.curr
 			for i, v := range dec.values {
@@ -266,7 +277,7 @@ func (dec *decoder) decode() error {
 			}
 		} else {
 			// has index, so to decode value by index indicated
-			index, err := strconv.Atoi(dec.key)
+			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
 				return newError(fmt.Errorf("formam: the index of array is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
 			}
@@ -274,7 +285,7 @@ func (dec *decoder) decode() error {
 			return dec.decode()
 		}
 	case reflect.Slice:
-		if dec.key == "" {
+		if dec.bracket == "" {
 			// not has index, so to decode all values in the slice/array
 			dec.expandSlice(len(dec.values))
 			tmp := dec.curr
@@ -287,7 +298,7 @@ func (dec *decoder) decode() error {
 			}
 		} else {
 			// has index, so to decode value by index indicated
-			index, err := strconv.Atoi(dec.key)
+			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
 				return newError(fmt.Errorf("formam: the index of slice is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
 			}
@@ -347,6 +358,10 @@ func (dec *decoder) decode() error {
 			}
 			dec.curr.Set(reflect.ValueOf(*u))
 		default:
+			if dec.isKey {
+				dec.field = dec.value
+				return dec.begin()
+			}
 			return newError(fmt.Errorf("formam: not supported type for field \"%v\" in path \"%v\"", dec.field, dec.path))
 		}
 	default:
