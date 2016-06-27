@@ -21,96 +21,6 @@ type pathMap struct {
 	path string
 }
 
-// decode decodes the key of the map
-func (v *pathMap) decode() error {
-	key := v.m.Type().Key()
-
-	// check if the key implements the UnmarshalText interface
-	var val reflect.Value
-	if key.Kind() == reflect.Ptr {
-		val = reflect.New(key.Elem())
-	} else {
-		val = reflect.New(key).Elem()
-	}
-	ok, err := unmarshalText(val, v.key)
-	if ok {
-		v.m.SetMapIndex(val, v.value)
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	// if the key not implements the UnmarahalText interface then...
-	switch key.Kind() {
-	case reflect.String:
-		v.m.SetMapIndex(reflect.ValueOf(v.key), v.value)
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		num, err := strconv.ParseInt(v.key, 10, 64)
-		if err != nil {
-			return newError(fmt.Errorf("formam: the key's value \"%v\" in path \"%v\" is not a valid signed integer number", v.key, v.path))
-		}
-		switch key.Kind() {
-		case reflect.Int:
-			v.m.SetMapIndex(reflect.ValueOf(int(num)), v.value)
-		case reflect.Int8:
-			v.m.SetMapIndex(reflect.ValueOf(int8(num)), v.value)
-		case reflect.Int16:
-			v.m.SetMapIndex(reflect.ValueOf(int16(num)), v.value)
-		case reflect.Int32:
-			v.m.SetMapIndex(reflect.ValueOf(int32(num)), v.value)
-		case reflect.Int64:
-			v.m.SetMapIndex(reflect.ValueOf(int64(num)), v.value)
-		}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		num, err := strconv.ParseUint(v.key, 10, 64)
-		if err != nil {
-			return newError(fmt.Errorf("formam: the key's value \"%v\" in path \"%v\" is not a valid unsigned integer number", v.key, v.path))
-		}
-		switch key.Kind() {
-		case reflect.Uint:
-			v.m.SetMapIndex(reflect.ValueOf(uint(num)), v.value)
-		case reflect.Uint8:
-			v.m.SetMapIndex(reflect.ValueOf(uint8(num)), v.value)
-		case reflect.Uint16:
-			v.m.SetMapIndex(reflect.ValueOf(uint16(num)), v.value)
-		case reflect.Uint32:
-			v.m.SetMapIndex(reflect.ValueOf(uint32(num)), v.value)
-		case reflect.Uint64:
-			v.m.SetMapIndex(reflect.ValueOf(uint64(num)), v.value)
-		case reflect.Uintptr:
-			v.m.SetMapIndex(reflect.ValueOf(uintptr(num)), v.value)
-		}
-	case reflect.Float32, reflect.Float64:
-		num, err := strconv.ParseFloat(v.key, key.Bits())
-		if err != nil {
-			return newError(fmt.Errorf("formam: the key's value \"%v\" in path \"%v\" is not a valid float number", v.key, v.path))
-		}
-		switch key.Kind() {
-		case reflect.Float32:
-			v.m.SetMapIndex(reflect.ValueOf(float32(num)), v.value)
-		case reflect.Float64:
-			v.m.SetMapIndex(reflect.ValueOf(float64(num)), v.value)
-		}
-	case reflect.Bool:
-		switch v.key {
-		case "true", "on", "1":
-			v.m.SetMapIndex(reflect.ValueOf(true), v.value)
-		case "false", "off", "0":
-			v.m.SetMapIndex(reflect.ValueOf(false), v.value)
-		default:
-			return newError(fmt.Errorf("formam: the key's value \"%v\" in path \"%v\" is not a valid boolean", v.value, v.path))
-		}
-	case reflect.Array:
-		return newError(fmt.Errorf("formam: the type Array is not implemented yet for key in maps..."))
-	case reflect.Struct:
-		return newError(fmt.Errorf("formam: the type Struct is not implemented yet for key in maps..."))
-	default:
-		return newError(fmt.Errorf("formam: the key's type \"%v\" in path \"%v\" is not a valid type", key.Kind().String(), v.path))
-	}
-
-	return nil
-}
-
 // a pathMaps holds the values for each key
 type pathMaps []*pathMap
 
@@ -161,10 +71,23 @@ func Decode(vs url.Values, dst interface{}) error {
 		}
 	}
 	// set values of maps
-	for i := range dec.maps {
-		if err := dec.maps[i].decode(); err != nil {
+	for _, v := range dec.maps {
+		key := v.m.Type().Key()
+		// check if the key implements the UnmarshalText interface
+		var val reflect.Value
+		if key.Kind() == reflect.Ptr {
+			val = reflect.New(key.Elem())
+		} else {
+			val = reflect.New(key).Elem()
+		}
+		// decode key
+		dec.curr = val
+		dec.value = v.key
+		if err := dec.decode(); err != nil {
 			return err
 		}
+		// set key with its value
+		v.m.SetMapIndex(dec.curr, v.value)
 	}
 	dec.maps = make(pathMaps, 0)
 	return nil

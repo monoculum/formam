@@ -532,7 +532,7 @@ func TestDecodeInStruct(t *testing.T) {
 		}
 	}
 
-	fmt.Println("RESULT: ", m, m.MapWithCustomKey)
+	fmt.Println("RESULT: ", m)
 }
 
 type TestSlice []string
