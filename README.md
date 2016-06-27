@@ -18,7 +18,6 @@ Features
 * decode `url.URL`
 * The `slice` and `array` is possible to access without to indicate a index (If it is the last field, of course)`
 * You can to register a `func` for a `custom type`
-``
 
 Performance
 -----------
@@ -133,7 +132,8 @@ func MyHandler(w http.ResponseWriter, r *http.Request) error {
       Interface: &InterfaceStruct{},
   }
   r.ParseForm()
-  if err := formam.Decode(r.Form, &m); err != nil {
+  dec := formam.NewDecoder(&formam.DecoderOptions{TagName: "form"})
+  if err := dec.Decode(r.Form, &m); err != nil {
   		return err
   }
   return nil
