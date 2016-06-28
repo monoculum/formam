@@ -164,7 +164,7 @@ type Company struct {
 
 func MyHandler(w http.ResponseWriter, r *http.Request) error {
   m := Company{
-      Interface: &InterfaceStruct{},
+      Interface: &InterfaceStruct{}, // its is possible to access to the fields although it's an interface field!
   }
   r.ParseForm()
   dec := formam.NewDecoder(&formam.DecoderOptions{TagName: "formam"})
