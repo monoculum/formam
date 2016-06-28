@@ -61,10 +61,10 @@ For example:
 ```go
 decoder.RegisterCustomType(func(vals []string) (interface{}, error) {
         return time.Parse("2006-01-02", vals[0])
-    }, []interface{}{time.Time{}}, nil)
+}, []interface{}{time.Time{}}, nil)
 ```
 
-#### Specific fields
+##### Specific fields
 
 ```go
 package main
