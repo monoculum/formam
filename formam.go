@@ -70,7 +70,10 @@ type Decoder struct {
 
 // DecoderOptions options for decoding the values
 type DecoderOptions struct {
+	// TagName indicates the tag name for decoding a value by the tag
 	TagName string
+	// PrefUnmarshalText indicates if should to give preference to UnmarshalText over custom type registered
+	PrefUnmarshalText bool
 }
 
 // RegisterCustomType It is the method responsible for register functions for decoding custom types
@@ -345,13 +348,20 @@ func (dec *Decoder) end() error {
 
 // decode sets the value in the field
 func (dec *Decoder) decode() error {
-	// has registered a custom type? If so, then decode by it
-	if ok, err := dec.checkCustomType(); ok || err != nil {
-		return err
-	}
-	// implements UnmarshalText interface? If so, then decode by it
-	if ok, err := checkUnmarshalText(dec.curr, dec.value); ok || err != nil {
-		return err
+	if dec.opts.PrefUnmarshalText {
+		if ok, err := checkUnmarshalText(dec.curr, dec.value); ok || err != nil {
+			return err
+		}
+		if ok, err := dec.checkCustomType(); ok || err != nil {
+			return err
+		}
+	} else {
+		if ok, err := dec.checkCustomType(); ok || err != nil {
+			return err
+		}
+		if ok, err := checkUnmarshalText(dec.curr, dec.value); ok || err != nil {
+			return err
+		}
 	}
 
 	switch dec.curr.Kind() {
