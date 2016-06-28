@@ -532,15 +532,8 @@ func (dec *Decoder) checkCustomType() (bool, error) {
 					return true, nil
 				}
 			}
-			if v.fun != nil {
-				va, err := v.fun(dec.values)
-				if err != nil {
-					return true, err
-				}
-				dec.curr.Set(reflect.ValueOf(va))
-				return true, nil
-			}
-		} else {
+		}
+		if v.fun != nil {
 			va, err := v.fun(dec.values)
 			if err != nil {
 				return true, err
