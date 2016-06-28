@@ -146,6 +146,10 @@ type TestStruct struct {
 
 	// custom type
 	CustomType FieldString
+	// custom type by field
+	Time1       time.Time
+	Time2       time.Time
+	TimeDefault time.Time
 }
 
 type InterfaceStruct struct {
@@ -217,7 +221,6 @@ var vals = url.Values{
 	"MapWithCustomKeyPointer[11e5bf2d3e403a8c86740023dffe5350]": []string{"UUID key pointer in map"},
 	"MapWithStruct1Key[2006-01-02]":                             []string{"time.Time key in map"},
 	"MapWithStruct2Key[http://www.monoculum.com]":               []string{"url.URL key in map"},
-	//"MapWithStruct3Key[ID.ID]":                                  []string{"struct key in map"},
 
 	// unmarshal text
 	"UnmarshalTextString": []string{"If you see this text, then it's a bug"},
@@ -239,6 +242,10 @@ var vals = url.Values{
 
 	// custom type
 	"CustomType": []string{"if you see this text, then it's a bug"},
+	// custom type by field
+	"Time1":       []string{"2001-01-01"},
+	"Time2":       []string{"2001-01-01"},
+	"TimeDefault": []string{"2001-01-01"},
 }
 
 func TestDecodeInStruct(t *testing.T) {
@@ -247,7 +254,20 @@ func TestDecodeInStruct(t *testing.T) {
 
 	dec := NewDecoder(nil).RegisterCustomType(func(vals []string) (interface{}, error) {
 		return FieldString("value changed by custom type"), nil
-	}, FieldString(""))
+	}, []interface{}{FieldString("")}, nil)
+
+	dec.RegisterCustomType(func(vals []string) (interface{}, error) {
+		return time.Parse("2006-01-02", "2016-01-02")
+	}, []interface{}{time.Time{}}, []interface{}{&m.Time1})
+
+	dec.RegisterCustomType(func(vals []string) (interface{}, error) {
+		return time.Parse("2006-01-02", "2017-01-02")
+	}, []interface{}{time.Time{}}, []interface{}{&m.Time2})
+
+	dec.RegisterCustomType(func(vals []string) (interface{}, error) {
+		return time.Parse("2006-01-02", "2018-01-02")
+	}, []interface{}{time.Time{}}, []interface{}{})
+
 	err := dec.Decode(vals, &m)
 	if err != nil {
 		t.Error(err)
@@ -567,8 +587,18 @@ func TestDecodeInStruct(t *testing.T) {
 			t.Error("The value of InterfaceStruct.Name is empty")
 		}
 	}
+	// custom type
 	if m.CustomType != "value changed by custom type" {
 		t.Error("The value of CustomType is not correct")
+	}
+	if m.Time1.IsZero() {
+		t.Error("The value of Time1 is not correct")
+	}
+	if m.Time2.IsZero() {
+		t.Error("The value of Time2 is not correct")
+	}
+	if m.TimeDefault.IsZero() {
+		t.Error("The value of TimeDefault is not correct")
 	}
 
 	fmt.Println("RESULT: ", m)

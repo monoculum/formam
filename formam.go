@@ -36,6 +36,18 @@ func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
 // DecodeCustomTypeFunc is a function that indicate how should to decode a custom type
 type DecodeCustomTypeFunc func([]string) (interface{}, error)
 
+// DecodeCustomTypeField is a function registered for a specific field of the struct passed to the Decoder
+type DecodeCustomTypeField struct {
+	field reflect.Value
+	fun   DecodeCustomTypeFunc
+}
+
+// DecodeCustomType fields for custom types
+type DecodeCustomType struct {
+	fun    DecodeCustomTypeFunc
+	fields []DecodeCustomTypeField
+}
+
 // Decoder the main to decode the values
 type Decoder struct {
 	main       reflect.Value
@@ -53,7 +65,7 @@ type Decoder struct {
 
 	maps pathMaps
 
-	customTypes map[reflect.Type]DecodeCustomTypeFunc
+	customTypes map[reflect.Type]*DecodeCustomType
 }
 
 // DecoderOptions options for decoding the values
@@ -62,12 +74,24 @@ type DecoderOptions struct {
 }
 
 // RegisterCustomType It is the method responsible for register functions for decoding custom types
-func (dec *Decoder) RegisterCustomType(fn DecodeCustomTypeFunc, types ...interface{}) *Decoder {
+func (dec *Decoder) RegisterCustomType(fn DecodeCustomTypeFunc, types []interface{}, fields []interface{}) *Decoder {
 	if dec.customTypes == nil {
-		dec.customTypes = make(map[reflect.Type]DecodeCustomTypeFunc)
+		dec.customTypes = make(map[reflect.Type]*DecodeCustomType)
 	}
 	for i := range types {
-		dec.customTypes[reflect.TypeOf(types[i])] = fn
+		typ := reflect.TypeOf(types[i])
+		if dec.customTypes[typ] == nil {
+			dec.customTypes[typ] = new(DecodeCustomType)
+		}
+		if len(fields) > 0 {
+			for j := range fields {
+				va := reflect.ValueOf(fields[j])
+				f := DecodeCustomTypeField{field: va, fun: fn}
+				dec.customTypes[typ].fields = append(dec.customTypes[typ].fields, f)
+			}
+		} else {
+			dec.customTypes[typ].fun = fn
+		}
 	}
 	return dec
 }
@@ -136,6 +160,9 @@ func (dec *Decoder) prepare() error {
 			val = reflect.New(key).Elem()
 		}
 		// decode key
+		dec.path = v.path
+		dec.field = v.path
+		dec.values = []string{v.key}
 		dec.curr = val
 		dec.value = v.key
 		dec.isKey = true
@@ -165,9 +192,12 @@ func (dec *Decoder) begin() (err error) {
 			inBracket = true
 			dec.field = tmp[lastPos:i]
 			lastPos = i + 1
-			if err = dec.walk(); err != nil {
-				return
-			}
+			/*
+				if err = dec.walk(); err != nil {
+					return
+				}
+			*/
+			continue
 		} else if inBracket {
 			// it is inside of bracket, so get its value
 			if char == ']' {
@@ -195,6 +225,7 @@ func (dec *Decoder) begin() (err error) {
 				// still inside the bracket, so follow getting its value
 				valBracket += string(char)
 			}
+			continue
 		} else if !inBracket {
 			// not found any bracket, so try found a field
 			if char == '.' {
@@ -213,6 +244,7 @@ func (dec *Decoder) begin() (err error) {
 					return
 				}
 			}
+			continue
 		}
 	}
 	// last field of path
@@ -489,12 +521,33 @@ func (dec *Decoder) checkCustomType() (bool, error) {
 		return false, nil
 	}
 	if v, ok := dec.customTypes[dec.curr.Type()]; ok {
-		va, err := v(dec.values)
-		if err != nil {
-			return true, err
+		if len(v.fields) > 0 {
+			for i := range v.fields {
+				if v.fields[i].field.Elem() == dec.curr {
+					va, err := v.fields[i].fun(dec.values)
+					if err != nil {
+						return true, err
+					}
+					dec.curr.Set(reflect.ValueOf(va))
+					return true, nil
+				}
+			}
+			if v.fun != nil {
+				va, err := v.fun(dec.values)
+				if err != nil {
+					return true, err
+				}
+				dec.curr.Set(reflect.ValueOf(va))
+				return true, nil
+			}
+		} else {
+			va, err := v.fun(dec.values)
+			if err != nil {
+				return true, err
+			}
+			dec.curr.Set(reflect.ValueOf(va))
+			return true, nil
 		}
-		dec.curr.Set(reflect.ValueOf(va))
-		return true, nil
 	}
 	return false, nil
 }

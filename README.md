@@ -17,7 +17,7 @@ Features
 * decode `time.Time` with format "2006-01-02"
 * decode `url.URL`
 * The `slice` and `array` is possible to access without to indicate a index (If it is the last field, of course)`
-* You can to register a `func` for a `custom type`
+* You can to register a `func` for a `custom type` for all fields that include it or one in particular! (see example below)
 
 Performance
 -----------
@@ -53,12 +53,47 @@ Is possible unmarshaling data and the key of a map by the `encoding.TextUnmarsha
 Custom Type
 -----------
 
-Is possible to register a function for a custom type. Types registered has preference over UnmarshalText method. For example:
+Is possible to register a function for a custom type for all fields that include it or one in particular. Types registered has preference over UnmarshalText method.
+For example:
+
+##### All fields
 
 ```go
 decoder.RegisterCustomType(func(vals []string) (interface{}, error) {
         return time.Parse("2006-01-02", vals[0])
-    }, time.Time{})
+    }, []interface{}{time.Time{}}, nil)
+```
+
+#### Specific fields
+
+```go
+package main
+
+type Times struct {
+    Timestamp   time.Time
+    Time        time.Time
+    TimeDefault time.Time
+}
+
+func main() {
+    var t Timestamp
+    
+    dec := NewDecoder(nil)
+    // for Timestamp field
+    dec.RegisterCustomType(func(vals []string) (interface{}, error) {
+            return time.Parse("2006-01-02T15:04:05Z07:00", vals[0])
+    }, []interface{}{time.Time{}}, []interface{}{&t.Timestamp{}}) 
+    // for Time field
+    dec.RegisterCustomType(func(vals []string) (interface{}, error) {
+                return time.Parse("Mon, 02 Jan 2006 15:04:05 MST", vals[0])
+    }, []interface{}{time.Time{}}, []interface{}{&t.Time{}}) 
+    // for field that not be Time or Timestamp, i.e, in this example, TimeDefault.
+    dec.RegisterCustomType(func(vals []string) (interface{}, error) {
+                return time.Parse("2006-01-02", vals[0])
+    }, []interface{}{time.Time{}}, nil)
+    
+    dec.Decode(url.Values{}, &t)
+}
 ```
 
 Notes
