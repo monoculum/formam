@@ -14,7 +14,7 @@ Features
 * `UnmarshalText` in values and keys of maps.
 * the `map`'s key supported are: `string`, `int` and variants, `uint` and variants, `uintptr`, `float32`, `float64`, `bool`, `struct` and `custom types` to one of the above types registered by function or `UnmarshalText` method
 * A field with `interface{}` that has a `map`, `struct` or `slice` as value is perfectly possible access to them! (see example below)
-* decode `time.Time` with format "2006-01-02"
+* decode `time.Time` with format "2006-01-02" by its UnmarshalText method.
 * decode `url.URL`
 * The `slice` and `array` is possible to access without to indicate a index (If it is the last field, of course)`
 * You can to register a `func` for a `custom type` for all fields that include it or one in particular! (see example below)
