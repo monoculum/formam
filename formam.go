@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+	"encoding"
 )
 
 const tagName = "formam"
@@ -344,7 +345,7 @@ func (dec *Decoder) end() error {
 // decode sets the value in the field
 func (dec *Decoder) decode() error {
 	if dec.opts.PrefUnmarshalText {
-		if ok, err := checkUnmarshalText(dec.curr, dec.value); ok || err != nil {
+		if ok, err := dec.checkUnmarshalText(dec.curr); ok || err != nil {
 			return err
 		}
 		if ok, err := dec.checkCustomType(); ok || err != nil {
@@ -354,7 +355,7 @@ func (dec *Decoder) decode() error {
 		if ok, err := dec.checkCustomType(); ok || err != nil {
 			return err
 		}
-		if ok, err := checkUnmarshalText(dec.curr, dec.value); ok || err != nil {
+		if ok, err := dec.checkUnmarshalText(dec.curr); ok || err != nil {
 			return err
 		}
 	}
@@ -548,4 +549,29 @@ func (dec *Decoder) checkCustomType() (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+var (
+	typeTime    = reflect.TypeOf(time.Time{})
+	typeTimePtr = reflect.TypeOf(&time.Time{})
+)
+
+// unmarshalText returns a boolean and error. The boolean is true if the
+// value implements TextUnmarshaler, and false if not.
+func (dec *Decoder) checkUnmarshalText(v reflect.Value) (bool, error) {
+	// check if implements the interface
+	m, ok := v.Interface().(encoding.TextUnmarshaler)
+	addr := v.CanAddr()
+	if !ok && !addr {
+		return false, nil
+	} else if addr {
+		return dec.checkUnmarshalText(v.Addr())
+	}
+	// skip if the type is time.Time
+	n := v.Type()
+	if n.ConvertibleTo(typeTime) || n.ConvertibleTo(typeTimePtr) {
+		return false, nil
+	}
+	// return result
+	return true, m.UnmarshalText([]byte(dec.value))
 }
