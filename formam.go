@@ -56,13 +56,12 @@ type Decoder struct {
 	opts       *DecoderOptions
 
 	curr   reflect.Value
-	value  string
 	values []string
 
 	path    string
 	field   string
 	bracket string
-	isKey   bool
+	//isKey   bool
 
 	maps pathMaps
 
@@ -113,7 +112,7 @@ func NewDecoder(opts *DecoderOptions) *Decoder {
 }
 
 // Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
-func (dec *Decoder) Decode(vs url.Values, dst interface{}) error {
+func (dec Decoder) Decode(vs url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr {
 		return newError(fmt.Errorf("the value passed for decode is not a pointer but a %v", main.Kind()))
@@ -139,15 +138,13 @@ func Decode(vs url.Values, dst interface{}) error {
 	return dec.prepare()
 }
 
-func (dec *Decoder) prepare() error {
+func (dec Decoder) prepare() error {
 	// iterate over the form's values and decode it
 	for k, v := range dec.formValues {
 		dec.path = k
-		dec.field = k
 		dec.values = v
-		dec.value = v[0]
 		dec.curr = dec.main
-		if dec.value != "" {
+		if len(dec.values) > 0 {
 			if err := dec.begin(); err != nil {
 				return err
 			}
@@ -170,8 +167,7 @@ func (dec *Decoder) prepare() error {
 		dec.field = v.path
 		dec.values = []string{v.key}
 		dec.curr = val
-		dec.value = v.key
-		dec.isKey = true
+		//dec.isKey = true
 		if err := dec.decode(); err != nil {
 			return err
 		}
@@ -182,20 +178,19 @@ func (dec *Decoder) prepare() error {
 		// set key with its value
 		v.ma.SetMapIndex(dec.curr, v.value)
 	}
-	dec.maps = make(pathMaps, 0)
 	return nil
 }
 
 // begin analyzes the current path to walk through it
 func (dec *Decoder) begin() (err error) {
 	inBracket := false
-	valBracket := ""
+	valBracket := make([]byte, 0)
 	bracketClosed := false
 	lastPos := 0
-	tmp := dec.field
+	tmp := dec.path
 
 	// parse path
-	for i, char := range tmp {
+	for i, char := range []byte(tmp) {
 		if char == '[' && inBracket == false {
 			// found an opening bracket
 			bracketClosed = false
@@ -220,15 +215,15 @@ func (dec *Decoder) begin() (err error) {
 				// and put as false inBracket and pass the value of bracket to dec.key
 				inBracket = false
 				bracketClosed = true
-				dec.bracket = valBracket
+				dec.bracket = string(valBracket)
 				lastPos = i + 1
 				if err = dec.walk(); err != nil {
 					return
 				}
-				valBracket = ""
+				valBracket = make([]byte, 0)
 			} else {
 				// still inside the bracket, so follow getting its value
-				valBracket += string(char)
+				valBracket = append(valBracket, char)
 			}
 			continue
 		} else if !inBracket {
@@ -271,6 +266,7 @@ func (dec *Decoder) walk() error {
 		case reflect.Map:
 			dec.walkInMap(dec.field)
 		}
+		dec.field = ""
 	}
 	// check if is a interface and it is not nil. This mean that the interface
 	// has a struct, map or slice as value
@@ -307,14 +303,16 @@ func (dec *Decoder) walk() error {
 		default:
 			return newError(fmt.Errorf("the field \"%v\" in path \"%v\" has a index for array but it is a %v", dec.field, dec.path, dec.curr.Kind()))
 		}
+		dec.bracket = ""
 	}
-	dec.field = ""
-	dec.bracket = ""
 	return nil
 }
 
 // walkMap puts in d.curr the map concrete for decode the current value
 func (dec *Decoder) walkInMap(key string) {
+	if dec.maps == nil {
+		dec.maps = make(pathMaps, 0)
+	}
 	n := dec.curr.Type()
 	takeAndAppend := func() {
 		m := reflect.New(n.Elem()).Elem()
@@ -342,7 +340,7 @@ func (dec *Decoder) end() error {
 		// leave backward compatibility for access to maps by .
 		dec.walkInMap(dec.field)
 	}
-	if dec.value == "" {
+	if dec.values[0] == "" {
 		return nil
 	}
 	return dec.decode()
@@ -394,27 +392,27 @@ func (dec *Decoder) decode() error {
 			return dec.decode()
 		}
 	case reflect.String:
-		dec.curr.SetString(dec.value)
+		dec.curr.SetString(dec.values[0])
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if num, err := strconv.ParseInt(dec.value, 10, 64); err != nil {
+		if num, err := strconv.ParseInt(dec.values[0], 10, 64); err != nil {
 			return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" should be a valid signed integer number", dec.field, dec.path))
 		} else {
 			dec.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		if num, err := strconv.ParseUint(dec.value, 10, 64); err != nil {
+		if num, err := strconv.ParseUint(dec.values[0], 10, 64); err != nil {
 			return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" should be a valid unsigned integer number", dec.field, dec.path))
 		} else {
 			dec.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
-		if num, err := strconv.ParseFloat(dec.value, dec.curr.Type().Bits()); err != nil {
+		if num, err := strconv.ParseFloat(dec.values[0], dec.curr.Type().Bits()); err != nil {
 			return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" should be a valid float number", dec.field, dec.path))
 		} else {
 			dec.curr.SetFloat(num)
 		}
 	case reflect.Bool:
-		switch dec.value {
+		switch dec.values[0] {
 		case "true", "on", "1":
 			dec.curr.SetBool(true)
 		case "false", "off", "0":
@@ -423,7 +421,7 @@ func (dec *Decoder) decode() error {
 			return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" is not a valid boolean", dec.field, dec.path))
 		}
 	case reflect.Interface:
-		dec.curr.Set(reflect.ValueOf(dec.value))
+		dec.curr.Set(reflect.ValueOf(dec.values[0]))
 	case reflect.Ptr:
 		n := reflect.New(dec.curr.Type().Elem())
 		if dec.curr.CanSet() {
@@ -436,13 +434,13 @@ func (dec *Decoder) decode() error {
 	case reflect.Struct:
 		switch dec.curr.Interface().(type) {
 		case time.Time:
-			t, err := time.Parse("2006-01-02", dec.value)
+			t, err := time.Parse("2006-01-02", dec.values[0])
 			if err != nil {
 				return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" is not a valid datetime", dec.field, dec.path))
 			}
 			dec.curr.Set(reflect.ValueOf(t))
 		case url.URL:
-			u, err := url.Parse(dec.value)
+			u, err := url.Parse(dec.values[0])
 			if err != nil {
 				return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" is not a valid url", dec.field, dec.path))
 			}
@@ -519,7 +517,7 @@ func (dec *Decoder) setValues() error {
 	tmp := dec.curr // hold current field
 	for i, v := range dec.values {
 		dec.curr = tmp.Index(i)
-		dec.value = v
+		dec.values[0] = v
 		if err := dec.decode(); err != nil {
 			return err
 		}
@@ -582,5 +580,5 @@ func (dec *Decoder) checkUnmarshalText(v reflect.Value) (bool, error) {
 		return false, nil
 	}
 	// return result
-	return true, m.UnmarshalText([]byte(dec.value))
+	return true, m.UnmarshalText([]byte(dec.values[0]))
 }
