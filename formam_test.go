@@ -110,8 +110,16 @@ type TestStruct struct {
 	MapWithArray map[string][2]int
 	// map with int key
 	MapWithIntKey map[int]string
+	// map with int8 key
+	MapWithInt8Key map[int8]string
+	// map with *int64 key
+	MapWithInt64PtrKey map[*int64]string
 	// map with uint key
 	MapWithUintKey map[uint]string
+	// map with uint key
+	MapWithUint8Key map[uint8]string
+	// map with uint key
+	MapWithUint32PtrKey map[*uint32]string
 	// map with float key
 	MapWithFloatKey map[float32]string
 	// map with boolean key
@@ -214,6 +222,10 @@ var vals = url.Values{
 	"MapWithArray[array][0]":                                    []string{"0"},
 	"MapWithArray[array][1]":                                    []string{"1"},
 	"MapWithIntKey[-1]":                                         []string{"int key in map"},
+	"MapWithInt8Key[-1]":                                        []string{"int8 key in map"},
+	"MapWithInt64PtrKey[-1]":                                    []string{"int64 ptr key in map"},
+	"MapWithUint8Key[1]":                                        []string{"uint8 ptr key in map"},
+	"MapWithUint32PtrKey[1]":                                    []string{"uint32 ptr key in map"},
 	"MapWithUintKey[1]":                                         []string{"uint key in map"},
 	"MapWithFloatKey[3.14]":                                     []string{"float key in map"},
 	"MapWithBooleanKey[true]":                                   []string{"bool key in map"},

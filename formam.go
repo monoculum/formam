@@ -2,12 +2,12 @@
 package formam
 
 import (
+	"encoding"
 	"fmt"
 	"net/url"
 	"reflect"
 	"strconv"
 	"time"
-	"encoding"
 )
 
 const tagName = "formam"
@@ -156,9 +156,11 @@ func (dec *Decoder) prepare() error {
 	// set values of maps
 	for _, v := range dec.maps {
 		key := v.ma.Type().Key()
+		ptr := false
 		// check if the key implements the UnmarshalText interface
 		var val reflect.Value
 		if key.Kind() == reflect.Ptr {
+			ptr = true
 			val = reflect.New(key.Elem())
 		} else {
 			val = reflect.New(key).Elem()
@@ -172,6 +174,10 @@ func (dec *Decoder) prepare() error {
 		dec.isKey = true
 		if err := dec.decode(); err != nil {
 			return err
+		}
+		// check if the key is a pointer or not. And if it is, then get its address
+		if ptr && dec.curr.Kind() != reflect.Ptr {
+			dec.curr = dec.curr.Addr()
 		}
 		// set key with its value
 		v.ma.SetMapIndex(dec.curr, v.value)
@@ -344,6 +350,7 @@ func (dec *Decoder) end() error {
 
 // decode sets the value in the field
 func (dec *Decoder) decode() error {
+	// check if has UnmarshalText method or a custom function to decode it
 	if dec.opts.PrefUnmarshalText {
 		if ok, err := dec.checkUnmarshalText(dec.curr); ok || err != nil {
 			return err
@@ -361,46 +368,27 @@ func (dec *Decoder) decode() error {
 	}
 
 	switch dec.curr.Kind() {
-	case reflect.Array:
+	case reflect.Slice, reflect.Array:
 		if dec.bracket == "" {
-			// not has index, so to decode all values in the array
-			tmp := dec.curr
-			for i, v := range dec.values {
-				dec.curr = tmp.Index(i)
-				dec.value = v
-				if err := dec.decode(); err != nil {
-					return err
-				}
+			// not has index, so to decode all values in the slice
+			if dec.curr.Kind() == reflect.Slice {
+				// only for slices
+				dec.expandSlice(len(dec.values))
+			}
+			if err := dec.setValues(); err != nil {
+				return err
 			}
 		} else {
 			// has index, so to decode value by index indicated
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError(fmt.Errorf("the index of array is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
+				return newError(fmt.Errorf("the index of slice/array is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
 			}
-			dec.curr = dec.curr.Index(index)
-			return dec.decode()
-		}
-	case reflect.Slice:
-		if dec.bracket == "" {
-			// not has index, so to decode all values in the slice/array
-			dec.expandSlice(len(dec.values))
-			tmp := dec.curr
-			for i, v := range dec.values {
-				dec.curr = tmp.Index(i)
-				dec.value = v
-				if err := dec.decode(); err != nil {
-					return err
+			if dec.curr.Kind() == reflect.Slice {
+				// only for slices
+				if dec.curr.Len() <= index {
+					dec.expandSlice(index + 1)
 				}
-			}
-		} else {
-			// has index, so to decode value by index indicated
-			index, err := strconv.Atoi(dec.bracket)
-			if err != nil {
-				return newError(fmt.Errorf("the index of slice is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
-			}
-			if dec.curr.Len() <= index {
-				dec.expandSlice(index + 1)
 			}
 			dec.curr = dec.curr.Index(index)
 			return dec.decode()
@@ -437,7 +425,12 @@ func (dec *Decoder) decode() error {
 	case reflect.Interface:
 		dec.curr.Set(reflect.ValueOf(dec.value))
 	case reflect.Ptr:
-		dec.curr.Set(reflect.New(dec.curr.Type().Elem()))
+		n := reflect.New(dec.curr.Type().Elem())
+		if dec.curr.CanSet() {
+			dec.curr.Set(n)
+		} else {
+			dec.curr.Elem().Set(n.Elem())
+		}
 		dec.curr = dec.curr.Elem()
 		return dec.decode()
 	case reflect.Struct:
@@ -521,6 +514,19 @@ func (dec *Decoder) expandSlice(length int) {
 	dec.curr.Set(n)
 }
 
+// setValues
+func (dec *Decoder) setValues() error {
+	tmp := dec.curr // hold current field
+	for i, v := range dec.values {
+		dec.curr = tmp.Index(i)
+		dec.value = v
+		if err := dec.decode(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // checkCustomType checks if the value to decode has a custom type registered
 func (dec *Decoder) checkCustomType() (bool, error) {
 	if dec.customTypes == nil {
@@ -529,6 +535,8 @@ func (dec *Decoder) checkCustomType() (bool, error) {
 	if v, ok := dec.customTypes[dec.curr.Type()]; ok {
 		if len(v.fields) > 0 {
 			for i := range v.fields {
+				// check if the current field is registered
+				// in the fields of the custom type
 				if v.fields[i].field.Elem() == dec.curr {
 					va, err := v.fields[i].fun(dec.values)
 					if err != nil {
@@ -539,6 +547,7 @@ func (dec *Decoder) checkCustomType() (bool, error) {
 				}
 			}
 		}
+		// check if the default function exists for fields not specific
 		if v.fun != nil {
 			va, err := v.fun(dec.values)
 			if err != nil {

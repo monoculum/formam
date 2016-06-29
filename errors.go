@@ -5,7 +5,7 @@ type Error struct {
 }
 
 func (s *Error) Error() string {
-	return "formam: "+s.err.Error()
+	return "formam: " + s.err.Error()
 }
 
 func newError(err error) *Error {
