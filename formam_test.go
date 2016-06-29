@@ -508,6 +508,23 @@ func TestDecodeInStruct(t *testing.T) {
 	} else {
 		t.Error("The key \"-1\" in MapWithIntKey not exists")
 	}
+	ñ, ok := m.MapWithInt8Key[-1]
+	if ok {
+		if ñ == "" {
+			t.Error("The value of MapWithInt8Key[-1] is empty")
+		}
+	} else {
+		t.Error("The key \"-1\" in MapWithInt8Key not exists")
+	}
+	if len(m.MapWithInt64PtrKey) == 0 {
+		t.Error("The MapWithInt64PtrKey is empty")
+	} else {
+		for _, v := range m.MapWithInt64PtrKey {
+			if v == "" {
+				t.Error("The value of MapWithInt64PtrKey[-1] is empty")
+			}
+		}
+	}
 	y, ok := m.MapWithUintKey[1]
 	if ok {
 		if y == "" {
@@ -515,6 +532,23 @@ func TestDecodeInStruct(t *testing.T) {
 		}
 	} else {
 		t.Error("The key \"1\" in MapWithUintKey not exists")
+	}
+	bb, ok := m.MapWithUint8Key[1]
+	if ok {
+		if bb == "" {
+			t.Error("The value of MapWithUint8Key[1] is empty")
+		}
+	} else {
+		t.Error("The key \"1\" in MapWithUint8Key not exists")
+	}
+	if len(m.MapWithUint32PtrKey) == 0 {
+		t.Error("The MapWithUint32PtrKey is empty")
+	} else {
+		for _, v := range m.MapWithUint32PtrKey {
+			if v == "" {
+				t.Error("The value of MapWithUint32PtrKey[1] is empty")
+			}
+		}
 	}
 	o, ok := m.MapWithFloatKey[3.14]
 	if ok {
