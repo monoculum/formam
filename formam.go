@@ -46,7 +46,7 @@ type DecodeCustomTypeField struct {
 // DecodeCustomType fields for custom types
 type DecodeCustomType struct {
 	fun    DecodeCustomTypeFunc
-	fields []DecodeCustomTypeField
+	fields []*DecodeCustomTypeField
 }
 
 // Decoder the main to decode the values
@@ -81,16 +81,17 @@ func (dec *Decoder) RegisterCustomType(fn DecodeCustomTypeFunc, types []interfac
 	if dec.customTypes == nil {
 		dec.customTypes = make(map[reflect.Type]*DecodeCustomType, 100)
 	}
+	lenFields := len(fields)
 	for i := range types {
 		typ := reflect.TypeOf(types[i])
 		if dec.customTypes[typ] == nil {
-			dec.customTypes[typ] = &DecodeCustomType{fun: fn}
+			dec.customTypes[typ] = &DecodeCustomType{fun: fn, fields: make([]*DecodeCustomTypeField, 0, lenFields)}
 		}
-		if len(fields) > 0 {
+		if lenFields > 0 {
 			for j := range fields {
-				va := reflect.ValueOf(fields[j])
-				f := DecodeCustomTypeField{field: va, fun: fn}
-				dec.customTypes[typ].fields = append(dec.customTypes[typ].fields, f)
+				val := reflect.ValueOf(fields[j])
+				field := &DecodeCustomTypeField{field: val, fun: fn}
+				dec.customTypes[typ].fields = append(dec.customTypes[typ].fields, field)
 			}
 		}
 	}
@@ -198,16 +199,6 @@ func (dec *Decoder) begin() (err error) {
 		} else if inBracket {
 			// it is inside of bracket, so get its value
 			if char == ']' {
-				/*
-					nextChar := tmp[i+1:]
-					if nextChar != "" {
-						t := nextChar[:1]
-						if t != "[" && t != "." {
-							valBracket += string(char)
-							continue
-						}
-					}
-				*/
 				// found an closing bracket, so it will be recently close, so put as true the bracketClosed
 				// and put as false inBracket and pass the value of bracket to dec.key
 				inBracket = false
