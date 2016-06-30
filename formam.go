@@ -25,10 +25,10 @@ type pathMap struct {
 type pathMaps []*pathMap
 
 // find find and get the value by the given key
-func (ma pathMaps) find(id reflect.Value, key string) *pathMap {
-	for _, v := range ma {
-		if v.ma == id && v.key == key {
-			return v
+func (m pathMaps) find(id reflect.Value, key string) *pathMap {
+	for i := range m {
+		if m[i].ma == id && m[i].key == key {
+			return m[i]
 		}
 	}
 	return nil
@@ -79,12 +79,12 @@ type DecoderOptions struct {
 // RegisterCustomType It is the method responsible for register functions for decoding custom types
 func (dec *Decoder) RegisterCustomType(fn DecodeCustomTypeFunc, types []interface{}, fields []interface{}) *Decoder {
 	if dec.customTypes == nil {
-		dec.customTypes = make(map[reflect.Type]*DecodeCustomType)
+		dec.customTypes = make(map[reflect.Type]*DecodeCustomType, 100)
 	}
 	for i := range types {
 		typ := reflect.TypeOf(types[i])
 		if dec.customTypes[typ] == nil {
-			dec.customTypes[typ] = new(DecodeCustomType)
+			dec.customTypes[typ] = &DecodeCustomType{fun: fn}
 		}
 		if len(fields) > 0 {
 			for j := range fields {
@@ -92,8 +92,6 @@ func (dec *Decoder) RegisterCustomType(fn DecodeCustomTypeFunc, types []interfac
 				f := DecodeCustomTypeField{field: va, fun: fn}
 				dec.customTypes[typ].fields = append(dec.customTypes[typ].fields, f)
 			}
-		} else {
-			dec.customTypes[typ].fun = fn
 		}
 	}
 	return dec
@@ -184,18 +182,17 @@ func (dec Decoder) prepare() error {
 // begin analyzes the current path to walk through it
 func (dec *Decoder) begin() (err error) {
 	inBracket := false
-	valBracket := make([]byte, 0)
 	bracketClosed := false
+	valBracket := make([]byte, 0, 1000)
 	lastPos := 0
-	tmp := dec.path
 
 	// parse path
-	for i, char := range []byte(tmp) {
+	for i, char := range []byte(dec.path) {
 		if char == '[' && inBracket == false {
 			// found an opening bracket
 			bracketClosed = false
 			inBracket = true
-			dec.field = tmp[lastPos:i]
+			dec.field = dec.path[lastPos:i]
 			lastPos = i + 1
 			continue
 		} else if inBracket {
@@ -220,7 +217,7 @@ func (dec *Decoder) begin() (err error) {
 				if err = dec.walk(); err != nil {
 					return
 				}
-				valBracket = make([]byte, 0)
+				valBracket = nil // empty slice
 			} else {
 				// still inside the bracket, so follow getting its value
 				valBracket = append(valBracket, char)
@@ -237,7 +234,7 @@ func (dec *Decoder) begin() (err error) {
 					continue
 				}
 				// found a field, but is not next of a closing bracket, for example: Field1.Field2
-				dec.field = tmp[lastPos:i]
+				dec.field = dec.path[lastPos:i]
 				//dec.field = tmp[:i]
 				lastPos = i + 1
 				if err = dec.walk(); err != nil {
@@ -248,7 +245,7 @@ func (dec *Decoder) begin() (err error) {
 		}
 	}
 	// last field of path
-	dec.field = tmp[lastPos:]
+	dec.field = dec.path[lastPos:]
 
 	return dec.end()
 }
@@ -264,7 +261,7 @@ func (dec *Decoder) walk() error {
 				return err
 			}
 		case reflect.Map:
-			dec.walkInMap(dec.field)
+			dec.walkInMap(true)
 		}
 		dec.field = ""
 	}
@@ -299,7 +296,7 @@ func (dec *Decoder) walk() error {
 			}
 			dec.curr = dec.curr.Index(index)
 		case reflect.Map:
-			dec.walkInMap(dec.bracket)
+			dec.walkInMap(false)
 		default:
 			return newError(fmt.Errorf("the field \"%v\" in path \"%v\" has a index for array but it is a %v", dec.field, dec.path, dec.curr.Kind()))
 		}
@@ -309,23 +306,38 @@ func (dec *Decoder) walk() error {
 }
 
 // walkMap puts in d.curr the map concrete for decode the current value
-func (dec *Decoder) walkInMap(key string) {
-	if dec.maps == nil {
-		dec.maps = make(pathMaps, 0)
-	}
+func (dec *Decoder) walkInMap(byField bool) {
 	n := dec.curr.Type()
-	takeAndAppend := func() {
+	makeAndAppend := func() {
+		if dec.maps == nil {
+			dec.maps = make(pathMaps, 0, 500)
+		}
 		m := reflect.New(n.Elem()).Elem()
-		dec.maps = append(dec.maps, &pathMap{dec.curr, key, m, dec.path})
+		if byField {
+			dec.maps = append(dec.maps, &pathMap{dec.curr, dec.field, m, dec.path})
+		} else {
+			dec.maps = append(dec.maps, &pathMap{dec.curr, dec.bracket, m, dec.path})
+		}
 		dec.curr = m
 	}
 	if dec.curr.IsNil() {
+		// map is nil
 		dec.curr.Set(reflect.MakeMap(n))
-		takeAndAppend()
-	} else if a := dec.maps.find(dec.curr, key); a == nil {
-		takeAndAppend()
+		makeAndAppend()
 	} else {
-		dec.curr = a.value
+		// map is not nil, so try find value by the key
+		var a *pathMap
+		if byField {
+			a = dec.maps.find(dec.curr, dec.field)
+		} else {
+			a = dec.maps.find(dec.curr, dec.bracket)
+		}
+		if a == nil {
+			// the key not exists
+			makeAndAppend()
+		} else {
+			dec.curr = a.value
+		}
 	}
 }
 
@@ -338,7 +350,7 @@ func (dec *Decoder) end() error {
 		}
 	case reflect.Map:
 		// leave backward compatibility for access to maps by .
-		dec.walkInMap(dec.field)
+		dec.walkInMap(true)
 	}
 	if dec.values[0] == "" {
 		return nil
@@ -366,13 +378,9 @@ func (dec *Decoder) decode() error {
 	}
 
 	switch dec.curr.Kind() {
-	case reflect.Slice, reflect.Array:
+	case reflect.Array:
 		if dec.bracket == "" {
 			// not has index, so to decode all values in the slice
-			if dec.curr.Kind() == reflect.Slice {
-				// only for slices
-				dec.expandSlice(len(dec.values))
-			}
 			if err := dec.setValues(); err != nil {
 				return err
 			}
@@ -380,13 +388,28 @@ func (dec *Decoder) decode() error {
 			// has index, so to decode value by index indicated
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError(fmt.Errorf("the index of slice/array is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
+				return newError(fmt.Errorf("the index of array is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
 			}
-			if dec.curr.Kind() == reflect.Slice {
-				// only for slices
-				if dec.curr.Len() <= index {
-					dec.expandSlice(index + 1)
-				}
+			dec.curr = dec.curr.Index(index)
+			return dec.decode()
+		}
+	case reflect.Slice:
+		if dec.bracket == "" {
+			// not has index, so to decode all values in the slice
+			// only for slices
+			dec.expandSlice(len(dec.values))
+			if err := dec.setValues(); err != nil {
+				return err
+			}
+		} else {
+			// has index, so to decode value by index indicated
+			index, err := strconv.Atoi(dec.bracket)
+			if err != nil {
+				return newError(fmt.Errorf("the index of slice is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
+			}
+			// only for slices
+			if dec.curr.Len() <= index {
+				dec.expandSlice(index + 1)
 			}
 			dec.curr = dec.curr.Index(index)
 			return dec.decode()
