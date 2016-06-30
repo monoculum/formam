@@ -183,8 +183,8 @@ func (dec Decoder) prepare() error {
 func (dec *Decoder) begin() (err error) {
 	inBracket := false
 	bracketClosed := false
-	valBracket := make([]byte, 0, 1000)
 	lastPos := 0
+	endPos := 0
 
 	// parse path
 	for i, char := range []byte(dec.path) {
@@ -212,15 +212,14 @@ func (dec *Decoder) begin() (err error) {
 				// and put as false inBracket and pass the value of bracket to dec.key
 				inBracket = false
 				bracketClosed = true
-				dec.bracket = string(valBracket)
+				dec.bracket = dec.path[lastPos:endPos]
 				lastPos = i + 1
 				if err = dec.walk(); err != nil {
 					return
 				}
-				valBracket = nil // empty slice
 			} else {
-				// still inside the bracket, so follow getting its value
-				valBracket = append(valBracket, char)
+				// still inside the bracket, so to save the end position
+				endPos = i + 1
 			}
 			continue
 		} else if !inBracket {
