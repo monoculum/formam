@@ -12,7 +12,7 @@ import (
 
 const tagName = "formam"
 
-// A pathMap holds the values of a map with its key and values correspondent
+// pathMap holds the values of a map with its key and values correspondent
 type pathMap struct {
 	ma    reflect.Value
 	key   string
@@ -21,10 +21,10 @@ type pathMap struct {
 	path string
 }
 
-// a pathMaps holds the values for each key
+// pathMaps holds the values for each key
 type pathMaps []*pathMap
 
-// find find and get the value by the given key
+// find finds and gets the value by the given key
 func (m pathMaps) find(id reflect.Value, key string) *pathMap {
 	for i := range m {
 		if m[i].ma == id && m[i].key == key {
@@ -118,7 +118,7 @@ func (dec Decoder) Decode(vs url.Values, dst interface{}) error {
 	}
 	dec.main = main.Elem()
 	dec.formValues = vs
-	return dec.prepare()
+	return dec.init()
 }
 
 // Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
@@ -134,17 +134,18 @@ func Decode(vs url.Values, dst interface{}) error {
 			TagName: tagName,
 		},
 	}
-	return dec.prepare()
+	return dec.init()
 }
 
-func (dec Decoder) prepare() error {
+// init initializes the decoding
+func (dec Decoder) init() error {
 	// iterate over the form's values and decode it
 	for k, v := range dec.formValues {
 		dec.path = k
 		dec.values = v
 		dec.curr = dec.main
 		if len(dec.values) > 0 {
-			if err := dec.begin(); err != nil {
+			if err := dec.analyzePath(); err != nil {
 				return err
 			}
 		}
@@ -180,8 +181,8 @@ func (dec Decoder) prepare() error {
 	return nil
 }
 
-// begin analyzes the current path to walk through it
-func (dec *Decoder) begin() (err error) {
+// analyzePath analyzes the current path to walk through it
+func (dec *Decoder) analyzePath() (err error) {
 	inBracket := false
 	bracketClosed := false
 	lastPos := 0
@@ -205,7 +206,7 @@ func (dec *Decoder) begin() (err error) {
 				bracketClosed = true
 				dec.bracket = dec.path[lastPos:endPos]
 				lastPos = i + 1
-				if err = dec.walk(); err != nil {
+				if err = dec.traverse(); err != nil {
 					return
 				}
 			} else {
@@ -227,7 +228,7 @@ func (dec *Decoder) begin() (err error) {
 				dec.field = dec.path[lastPos:i]
 				//dec.field = tmp[:i]
 				lastPos = i + 1
-				if err = dec.walk(); err != nil {
+				if err = dec.traverse(); err != nil {
 					return
 				}
 			}
@@ -241,7 +242,7 @@ func (dec *Decoder) begin() (err error) {
 }
 
 // walk traverses the current path until to the last field
-func (dec *Decoder) walk() error {
+func (dec *Decoder) traverse() error {
 	// check if there is field, if is so, then it should be struct or map (access by .)
 	if dec.field != "" {
 		// check if is a struct or map
@@ -251,7 +252,7 @@ func (dec *Decoder) walk() error {
 				return err
 			}
 		case reflect.Map:
-			dec.walkInMap(true)
+			dec.traverseInMap(true)
 		}
 		dec.field = ""
 	}
@@ -286,7 +287,7 @@ func (dec *Decoder) walk() error {
 			}
 			dec.curr = dec.curr.Index(index)
 		case reflect.Map:
-			dec.walkInMap(false)
+			dec.traverseInMap(false)
 		default:
 			return newError(fmt.Errorf("the field \"%v\" in path \"%v\" has a index for array but it is a %v", dec.field, dec.path, dec.curr.Kind()))
 		}
@@ -296,7 +297,7 @@ func (dec *Decoder) walk() error {
 }
 
 // walkMap puts in d.curr the map concrete for decode the current value
-func (dec *Decoder) walkInMap(byField bool) {
+func (dec *Decoder) traverseInMap(byField bool) {
 	n := dec.curr.Type()
 	makeAndAppend := func() {
 		if dec.maps == nil {
@@ -340,7 +341,7 @@ func (dec *Decoder) end() error {
 		}
 	case reflect.Map:
 		// leave backward compatibility for access to maps by .
-		dec.walkInMap(true)
+		dec.traverseInMap(true)
 	}
 	if dec.values[0] == "" {
 		return nil
@@ -352,17 +353,17 @@ func (dec *Decoder) end() error {
 func (dec *Decoder) decode() error {
 	// check if has UnmarshalText method or a custom function to decode it
 	if dec.opts.PrefUnmarshalText {
-		if ok, err := dec.checkUnmarshalText(dec.curr); ok || err != nil {
+		if ok, err := dec.isUnmarshalText(dec.curr); ok || err != nil {
 			return err
 		}
-		if ok, err := dec.checkCustomType(); ok || err != nil {
+		if ok, err := dec.isCustomType(); ok || err != nil {
 			return err
 		}
 	} else {
-		if ok, err := dec.checkCustomType(); ok || err != nil {
+		if ok, err := dec.isCustomType(); ok || err != nil {
 			return err
 		}
-		if ok, err := dec.checkUnmarshalText(dec.curr); ok || err != nil {
+		if ok, err := dec.isUnmarshalText(dec.curr); ok || err != nil {
 			return err
 		}
 	}
@@ -479,7 +480,7 @@ func (dec *Decoder) decode() error {
 	return nil
 }
 
-// findField finds a field by its name, if it is not found,
+// findStructField finds a field by its name, if it is not found,
 // then retry the search examining the tag "formam" of every field of struct
 func (dec *Decoder) findStructField() error {
 	var anon reflect.Value
@@ -525,7 +526,7 @@ func (dec *Decoder) expandSlice(length int) {
 	dec.curr.Set(n)
 }
 
-// setValues
+// setValues set the values in current slice/array
 func (dec *Decoder) setValues() error {
 	tmp := dec.curr // hold current field
 	for i, v := range dec.values {
@@ -538,8 +539,8 @@ func (dec *Decoder) setValues() error {
 	return nil
 }
 
-// checkCustomType checks if the value to decode has a custom type registered
-func (dec *Decoder) checkCustomType() (bool, error) {
+// isCustomType checks if the field's type to decode has a custom type registered
+func (dec *Decoder) isCustomType() (bool, error) {
 	if dec.customTypes == nil {
 		return false, nil
 	}
@@ -576,16 +577,16 @@ var (
 	typeTimePtr = reflect.TypeOf(&time.Time{})
 )
 
-// unmarshalText returns a boolean and error. The boolean is true if the
-// value implements TextUnmarshaler, and false if not.
-func (dec *Decoder) checkUnmarshalText(v reflect.Value) (bool, error) {
+// isUnmarshalText returns a boolean and error. The boolean is true if the
+// field's type implements TextUnmarshaler, and false if not.
+func (dec *Decoder) isUnmarshalText(v reflect.Value) (bool, error) {
 	// check if implements the interface
 	m, ok := v.Interface().(encoding.TextUnmarshaler)
 	addr := v.CanAddr()
 	if !ok && !addr {
 		return false, nil
 	} else if addr {
-		return dec.checkUnmarshalText(v.Addr())
+		return dec.isUnmarshalText(v.Addr())
 	}
 	// skip if the type is time.Time
 	n := v.Type()
