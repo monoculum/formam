@@ -144,7 +144,7 @@ func (dec Decoder) init() error {
 		dec.path = k
 		dec.values = v
 		dec.curr = dec.main
-		if len(dec.values) > 0 {
+		if len(dec.values) > 0 && dec.values[0] != "" {
 			if err := dec.analyzePath(); err != nil {
 				return err
 			}
