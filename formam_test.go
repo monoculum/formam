@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"testing"
 	"time"
+	"strconv"
 )
 
 type Text string
@@ -38,9 +39,14 @@ func (u UUID) String() string {
 
 const unmarshalTextString = "If you see this text, then it's a bug"
 
+type AnonymousID struct {
+	ID string
+}
+
 type Anonymous struct {
 	AnonymousField string
 	FieldOverride  string
+	*AnonymousID
 }
 
 type FieldString string
@@ -99,6 +105,8 @@ type TestStruct struct {
 	PointerToStruct *struct{ Field float64 }
 	// pointer to map
 	PointerToMap *map[string]string
+	// pointer to anonymous struct
+	PointerToSlice []Anonymous
 
 	// map
 	Map map[string]string
@@ -213,6 +221,12 @@ var vals = url.Values{
 
 	// byte
 	"Byte": []string{"20"},
+
+	// pointer
+	"Pointer": []string{"20"},
+	"PointerToStruct.Field": []string{"20"},
+	"PointerToMap[es]": []string{"20"},
+	"PointerToSlice[0].ID": []string{"20"},
 
 	// map
 	"Map[by.bracket.with.point]":                                []string{"by bracket"},
@@ -441,6 +455,37 @@ func TestDecodeInStruct(t *testing.T) {
 	// byte
 	if string(m.Byte) == "" {
 		t.Error("Byte is empty")
+	}
+
+	// pointer
+	if m.Pointer == nil {
+		t.Error("Pointer is nil")
+	} else if *m.Pointer == "" {
+		t.Error("Pointer is not nil but is empty")
+	}
+	if m.PointerToMap == nil {
+		t.Error("Pointer is nil")
+	} else if len(*m.PointerToMap) == 0 {
+		t.Error("PointerToMap is not nil but is empty")
+	} else  {
+		for k, _ := range *m.PointerToMap {
+			if (*m.PointerToMap)[k] == "" {
+				t.Error("PointerToMap["+k+"] is empty")
+			}
+		}
+	}
+	if m.PointerToSlice == nil {
+		t.Error("PointerToSlice is nil")
+	} else if len(m.PointerToSlice) == 0 {
+		t.Error("PointerToSlice is not nil but is empty")
+	} else  {
+		for i := range m.PointerToSlice {
+			if m.PointerToSlice[i].AnonymousID == nil {
+				t.Error("PointerToSlice["+strconv.Itoa(i)+"] is nil")
+			} else if m.PointerToSlice[i].ID == "" {
+				t.Error("PointerToSlice["+strconv.Itoa(i)+"].ID is empty")
+			}
+		}
 	}
 
 	// map

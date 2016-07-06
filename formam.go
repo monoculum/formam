@@ -496,6 +496,12 @@ func (dec *Decoder) findStructField() error {
 			// if the field is a anonymous struct, then iterate over its fields
 			tmp := dec.curr
 			dec.curr = dec.curr.FieldByIndex(field.Index)
+			if dec.curr.Kind() == reflect.Ptr {
+				if dec.curr.IsNil() {
+					dec.curr.Set(reflect.New(dec.curr.Type().Elem()))
+				}
+				dec.curr = dec.curr.Elem()
+			}
 			if err := dec.findStructField(); err != nil {
 				dec.curr = tmp
 				continue
