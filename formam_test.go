@@ -710,3 +710,23 @@ func TestDecodeInSlice(t *testing.T) {
 	}
 	fmt.Println("RESULT: ", t2)
 }
+
+func TestIgnoreUnknownKeys(t *testing.T) {
+	s := struct {
+		Name string
+	}{}
+	vals := url.Values{
+		"Name": []string{"Homer"},
+		"City": []string{"Springfield"},
+	}
+	dec := NewDecoder(&DecoderOptions{
+		IgnoreUnknownKeys: true,
+	})
+	err := dec.Decode(vals, &s)
+	if err != nil {
+		t.Error(err)
+	}
+	if s.Name != "Homer" {
+		t.Errorf("Expected Homer got %s", s.Name)
+	}
+}

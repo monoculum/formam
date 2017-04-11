@@ -74,6 +74,8 @@ type DecoderOptions struct {
 	TagName string
 	// PrefUnmarshalText indicates if should to give preference to UnmarshalText over custom type registered
 	PrefUnmarshalText bool
+	// IgnoreUnknownKeys controls the behaviour when the decoder encounters unknown keys in the map. If i is true and an unknown field is encountered, it is ignored. This is similar to how unknown keys are handled by encoding/json. If i is false then Decode will return an error. Note that any valid keys will still be decoded in to the target struct.
+	IgnoreUnknownKeys bool
 }
 
 // RegisterCustomType It is the method responsible for register functions for decoding custom types
@@ -460,6 +462,9 @@ func (dec *Decoder) decode() error {
 			}
 			dec.curr.Set(reflect.ValueOf(*u))
 		default:
+			if dec.opts.IgnoreUnknownKeys {
+				return nil
+			}
 			/*
 				if dec.isKey {
 					tmp := dec.curr
@@ -522,6 +527,9 @@ func (dec *Decoder) findStructField() error {
 		return nil
 	}
 
+	if dec.opts.IgnoreUnknownKeys {
+		return nil
+	}
 	return newError(fmt.Errorf("not found the field \"%v\" in the path \"%v\"", dec.field, dec.path))
 }
 
