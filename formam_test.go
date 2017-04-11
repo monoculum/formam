@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"strconv"
 	"testing"
 	"time"
-	"strconv"
 )
 
 type Text string
@@ -223,10 +223,10 @@ var vals = url.Values{
 	"Byte": []string{"20"},
 
 	// pointer
-	"Pointer": []string{"20"},
+	"Pointer":               []string{"20"},
 	"PointerToStruct.Field": []string{"20"},
-	"PointerToMap[es]": []string{"20"},
-	"PointerToSlice[0].ID": []string{"20"},
+	"PointerToMap[es]":      []string{"20"},
+	"PointerToSlice[0].ID":  []string{"20"},
 
 	// map
 	"Map[by.bracket.with.point]":                                []string{"by bracket"},
@@ -467,10 +467,10 @@ func TestDecodeInStruct(t *testing.T) {
 		t.Error("Pointer is nil")
 	} else if len(*m.PointerToMap) == 0 {
 		t.Error("PointerToMap is not nil but is empty")
-	} else  {
+	} else {
 		for k, _ := range *m.PointerToMap {
 			if (*m.PointerToMap)[k] == "" {
-				t.Error("PointerToMap["+k+"] is empty")
+				t.Error("PointerToMap[" + k + "] is empty")
 			}
 		}
 	}
@@ -478,12 +478,12 @@ func TestDecodeInStruct(t *testing.T) {
 		t.Error("PointerToSlice is nil")
 	} else if len(m.PointerToSlice) == 0 {
 		t.Error("PointerToSlice is not nil but is empty")
-	} else  {
+	} else {
 		for i := range m.PointerToSlice {
 			if m.PointerToSlice[i].AnonymousID == nil {
-				t.Error("PointerToSlice["+strconv.Itoa(i)+"] is nil")
+				t.Error("PointerToSlice[" + strconv.Itoa(i) + "] is nil")
 			} else if m.PointerToSlice[i].ID == "" {
-				t.Error("PointerToSlice["+strconv.Itoa(i)+"].ID is empty")
+				t.Error("PointerToSlice[" + strconv.Itoa(i) + "].ID is empty")
 			}
 		}
 	}
@@ -728,5 +728,24 @@ func TestIgnoreUnknownKeys(t *testing.T) {
 	}
 	if s.Name != "Homer" {
 		t.Errorf("Expected Homer got %s", s.Name)
+	}
+}
+
+func TestEmptyString(t *testing.T) {
+	s := struct {
+		Name string
+	}{
+		Name: "Homer",
+	}
+	vals := url.Values{
+		"Name": []string{""},
+	}
+	dec := NewDecoder(&DecoderOptions{})
+	err := dec.Decode(vals, &s)
+	if err != nil {
+		t.Error(err)
+	}
+	if s.Name == "Homer" {
+		t.Errorf("Expected empty string got %s", s.Name)
 	}
 }

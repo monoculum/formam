@@ -146,10 +146,8 @@ func (dec Decoder) init() error {
 		dec.path = k
 		dec.values = v
 		dec.curr = dec.main
-		if len(dec.values) > 0 && dec.values[0] != "" {
-			if err := dec.analyzePath(); err != nil {
-				return err
-			}
+		if err := dec.analyzePath(); err != nil {
+			return err
 		}
 	}
 	// set values of maps
@@ -344,9 +342,6 @@ func (dec *Decoder) end() error {
 	case reflect.Map:
 		// leave backward compatibility for access to maps by .
 		dec.traverseInMap(true)
-	}
-	if dec.values[0] == "" {
-		return nil
 	}
 	return dec.decode()
 }
