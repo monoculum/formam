@@ -445,9 +445,14 @@ func (dec *Decoder) decode() error {
 	case reflect.Struct:
 		switch dec.curr.Interface().(type) {
 		case time.Time:
-			t, err := time.Parse("2006-01-02", dec.values[0])
-			if err != nil {
-				return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" is not a valid datetime", dec.field, dec.path))
+			var t time.Time
+			// if the value is empty then no to try to parse it and leave "t" as a zero value to set it in the field
+			if dec.values[0] != "" {
+				var err error
+				t, err = time.Parse("2006-01-02", dec.values[0])
+				if err != nil {
+					return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" is not a valid datetime", dec.field, dec.path))
+				}
 			}
 			dec.curr.Set(reflect.ValueOf(t))
 		case url.URL:
