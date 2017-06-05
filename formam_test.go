@@ -749,3 +749,22 @@ func TestEmptyString(t *testing.T) {
 		t.Errorf("Expected empty string got %s", s.Name)
 	}
 }
+
+func TestIgnoredStructTag(t *testing.T) {
+	s := struct {
+		Name string `formam:"-"`
+	}{
+		Name: "Homer",
+	}
+	vals := url.Values{
+		"Name": []string{"Marge"},
+	}
+	dec := NewDecoder(&DecoderOptions{})
+	err := dec.Decode(vals, &s)
+	if err != nil {
+		t.Error(err)
+	}
+	if s.Name != "Homer" {
+		t.Errorf("Expected Homer got %s", s.Name)
+	}
+}
