@@ -465,17 +465,15 @@ func (dec *Decoder) decode() error {
 			if dec.opts.IgnoreUnknownKeys {
 				return nil
 			}
-			/*
-				if dec.isKey {
-					tmp := dec.curr
-					dec.field = dec.value
-					if err := dec.begin(); err != nil {
-						return err
-					}
-					dec.curr = tmp
+			num := dec.curr.NumField()
+			for i := 0; i < num; i++ {
+				field := dec.curr.Type().Field(i)
+				tag := field.Tag.Get(dec.opts.TagName)
+				if tag == "-" {
+					// skip this field
 					return nil
 				}
-			*/
+			}
 			return newError(fmt.Errorf("not supported type for field \"%v\" in path \"%v\". Maybe you should to include it the UnmarshalText interface or register it using custom type?", dec.field, dec.path))
 		}
 	default:
@@ -493,6 +491,11 @@ func (dec *Decoder) findStructField() error {
 	num := dec.curr.NumField()
 	for i := 0; i < num; i++ {
 		field := dec.curr.Type().Field(i)
+		tag := field.Tag.Get(dec.opts.TagName)
+		if tag == "-" {
+			// skip this field
+			return nil
+		}
 		if field.Name == dec.field {
 			// check if the field's name is equal
 			dec.curr = dec.curr.Field(i)
