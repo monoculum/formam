@@ -423,6 +423,10 @@ func (dec *Decoder) decode() error {
 			dec.curr.SetFloat(num)
 		}
 	case reflect.Bool:
+		if len(dec.values[0]) == 0 {
+			dec.curr.SetBool(false)
+			return nil
+		}
 		switch dec.values[0] {
 		case "true", "on", "1":
 			dec.curr.SetBool(true)
