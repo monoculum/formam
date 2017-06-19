@@ -423,17 +423,12 @@ func (dec *Decoder) decode() error {
 			dec.curr.SetFloat(num)
 		}
 	case reflect.Bool:
-		if len(dec.values[0]) == 0 {
+		switch dec.values[0] {
+		case "true", "on", "1", "checked":
+			dec.curr.SetBool(true)
+		default:
 			dec.curr.SetBool(false)
 			return nil
-		}
-		switch dec.values[0] {
-		case "true", "on", "1":
-			dec.curr.SetBool(true)
-		case "false", "off", "0":
-			dec.curr.SetBool(false)
-		default:
-			return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" is not a valid boolean", dec.field, dec.path))
 		}
 	case reflect.Interface:
 		dec.curr.Set(reflect.ValueOf(dec.values[0]))
