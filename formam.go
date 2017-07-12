@@ -476,6 +476,10 @@ func (dec *Decoder) decode() error {
 			return newError(fmt.Errorf("not supported type for field \"%v\" in path \"%v\". Maybe you should to include it the UnmarshalText interface or register it using custom type?", dec.field, dec.path))
 		}
 	default:
+		if dec.opts.IgnoreUnknownKeys {
+			return nil
+		}
+
 		return newError(fmt.Errorf("not supported type for field \"%v\" in path \"%v\"", dec.field, dec.path))
 	}
 

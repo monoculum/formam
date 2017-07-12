@@ -468,7 +468,7 @@ func TestDecodeInStruct(t *testing.T) {
 	} else if len(*m.PointerToMap) == 0 {
 		t.Error("PointerToMap is not nil but is empty")
 	} else {
-		for k, _ := range *m.PointerToMap {
+		for k := range *m.PointerToMap {
 			if (*m.PointerToMap)[k] == "" {
 				t.Error("PointerToMap[" + k + "] is empty")
 			}
@@ -713,11 +713,15 @@ func TestDecodeInSlice(t *testing.T) {
 
 func TestIgnoreUnknownKeys(t *testing.T) {
 	s := struct {
-		Name string
+		Name  string `formam:"Name"`
+		Map   map[string]string
+		Slice []string
 	}{}
 	vals := url.Values{
-		"Name": []string{"Homer"},
-		"City": []string{"Springfield"},
+		"Name":      []string{"Homer"},
+		"City":      []string{"Springfield"},
+		"Children.": []string{"Bart", "Lisa"},
+		"Job[":      []string{"Safety inspector"},
 	}
 	dec := NewDecoder(&DecoderOptions{
 		IgnoreUnknownKeys: true,
