@@ -691,8 +691,6 @@ func TestDecodeInStruct(t *testing.T) {
 	if m.TimeDefault.IsZero() {
 		t.Error("The value of TimeDefault is not correct")
 	}
-
-	fmt.Println("RESULT: ", m)
 }
 
 type TestSlice []string
@@ -708,7 +706,6 @@ func TestDecodeInSlice(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println("RESULT: ", t2)
 }
 
 func TestIgnoreUnknownKeys(t *testing.T) {
@@ -751,6 +748,22 @@ func TestIgnoreBracketedKeysError(t *testing.T) {
 	}
 }
 
+func TestIgnoreBracketedKeysIgnoreError(t *testing.T) {
+	s := []string{}
+	vals := url.Values{
+		"Name":      []string{"Homer"},
+		"[Wife]":    []string{"Marge"},
+		"His[Wife]": []string{"Marge"},
+	}
+	dec := NewDecoder(&DecoderOptions{
+		IgnoreUnknownKeys: true,
+	})
+	err := dec.Decode(vals, &s)
+	if err == nil {
+		t.Error("error is not nil")
+	}
+}
+
 func TestIgnoreBracketedKeysIgnoreStruct(t *testing.T) {
 	s := struct {
 		Name string `formam:"Name"`
@@ -769,28 +782,6 @@ func TestIgnoreBracketedKeysIgnoreStruct(t *testing.T) {
 	}
 	if s.Name != "Homer" {
 		t.Errorf("Expected Homer got %s", s.Name)
-	}
-}
-
-func TestIgnoreBracketedKeysIgnoreSlice(t *testing.T) {
-	s := []string{}
-	vals := url.Values{
-		"Name":      []string{"Homer"},
-		"[Wife]":    []string{"Marge"},
-		"His[Wife]": []string{"Marge"},
-	}
-	dec := NewDecoder(&DecoderOptions{
-		IgnoreUnknownKeys: true,
-	})
-	err := dec.Decode(vals, &s)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(s) != 1 {
-		t.Errorf("Expected len() 1 got %d", len(s))
-	}
-	if s[0] != "Homer" {
-		t.Errorf("Expected Homer got %s", s[0])
 	}
 }
 
