@@ -147,6 +147,9 @@ func (dec Decoder) init() error {
 		dec.values = v
 		dec.curr = dec.main
 		if err := dec.analyzePath(); err != nil {
+			if dec.curr.Kind() == reflect.Struct && dec.opts.IgnoreUnknownKeys {
+				continue
+			}
 			return err
 		}
 	}
