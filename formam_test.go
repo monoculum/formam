@@ -806,19 +806,35 @@ func TestEmptyString(t *testing.T) {
 
 func TestIgnoredStructTag(t *testing.T) {
 	s := struct {
-		Name string `formam:"-"`
+		Name     string `formam:"-"`
+		Phone    string
+		LastName string `formam:"lastname"`
 	}{
-		Name: "Homer",
+		Name:     "Homer",
+		LastName: "Bouvier",
+		Phone:    "555-555-111",
 	}
 	vals := url.Values{
-		"Name": []string{"Marge"},
+		"Name":     []string{"Marge"},
+		"lastname": []string{"Simpson"},
+		"Phone":    []string{"555-333-222"},
 	}
+
 	dec := NewDecoder(&DecoderOptions{})
 	err := dec.Decode(vals, &s)
 	if err != nil {
 		t.Error(err)
 	}
+
 	if s.Name != "Homer" {
 		t.Errorf("Expected Homer got %s", s.Name)
+	}
+
+	if s.LastName != "Simpson" {
+		t.Errorf("Expected LastName is Simpson but got %s", s.LastName)
+	}
+
+	if s.Phone != "555-333-222" {
+		t.Errorf("Expected new phone number '555-333-222' but got %s", s.Phone)
 	}
 }
