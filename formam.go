@@ -497,12 +497,13 @@ func (dec *Decoder) findStructField() error {
 	num := dec.curr.NumField()
 	for i := 0; i < num; i++ {
 		field := dec.curr.Type().Field(i)
-		tag := field.Tag.Get(dec.opts.TagName)
-		if tag == "-" {
-			// skip this field
-			return nil
-		}
+
 		if field.Name == dec.field {
+			tag := field.Tag.Get(dec.opts.TagName)
+			if tag == "-" {
+				// skip this field
+				return nil
+			}
 			// check if the field's name is equal
 			dec.curr = dec.curr.Field(i)
 			return nil
