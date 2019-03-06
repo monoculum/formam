@@ -1,9 +1,8 @@
-// Package formam implements functions to decode values of a html form.
+// Package formam decodes HTTP form and query parameters.
 package formam
 
 import (
 	"encoding"
-	"fmt"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -35,22 +34,22 @@ func (m pathMaps) find(id reflect.Value, key string) *pathMap {
 	return nil
 }
 
-// DecodeCustomTypeFunc is a function that indicate how should to decode a custom type
+// DecodeCustomTypeFunc for decoding a custom type.
 type DecodeCustomTypeFunc func([]string) (interface{}, error)
 
-// DecodeCustomTypeField is a function registered for a specific field of the struct passed to the Decoder
-type DecodeCustomTypeField struct {
+// decodeCustomTypeField is registered for a specific field.
+type decodeCustomTypeField struct {
 	field reflect.Value
 	fun   DecodeCustomTypeFunc
 }
 
-// DecodeCustomType fields for custom types
-type DecodeCustomType struct {
+// decodeCustomType fields for custom types.
+type decodeCustomType struct {
 	fun    DecodeCustomTypeFunc
-	fields []*DecodeCustomTypeField
+	fields []*decodeCustomTypeField
 }
 
-// Decoder the main to decode the values
+// Decoder to decode a form.
 type Decoder struct {
 	main       reflect.Value
 	formValues url.Values
@@ -66,34 +65,37 @@ type Decoder struct {
 
 	maps pathMaps
 
-	customTypes map[reflect.Type]*DecodeCustomType
+	customTypes map[reflect.Type]*decodeCustomType
 }
 
-// DecoderOptions options for decoding the values
+// DecoderOptions options for decoding the values.
 type DecoderOptions struct {
-	// TagName indicates the tag name for decoding a value by the tag
+	// Struct field tag name; default is "formam".
 	TagName string
-	// PrefUnmarshalText indicates if should to give preference to UnmarshalText over custom type registered
+
+	// Prefer UnmarshalText over custom types.
 	PrefUnmarshalText bool
-	// IgnoreUnknownKeys controls the behaviour when the decoder encounters unknown keys in the map. If i is true and an unknown field is encountered, it is ignored. This is similar to how unknown keys are handled by encoding/json. If i is false then Decode will return an error. Note that any valid keys will still be decoded in to the target struct.
+
+	// Ignore unknown form fields. By default unknown fields are an error
+	// (although all valid keys will still be decoded).
 	IgnoreUnknownKeys bool
 }
 
-// RegisterCustomType It is the method responsible for register functions for decoding custom types
+// RegisterCustomType registers a functions for decoding custom types.
 func (dec *Decoder) RegisterCustomType(fn DecodeCustomTypeFunc, types []interface{}, fields []interface{}) *Decoder {
 	if dec.customTypes == nil {
-		dec.customTypes = make(map[reflect.Type]*DecodeCustomType, 100)
+		dec.customTypes = make(map[reflect.Type]*decodeCustomType, 100)
 	}
 	lenFields := len(fields)
 	for i := range types {
 		typ := reflect.TypeOf(types[i])
 		if dec.customTypes[typ] == nil {
-			dec.customTypes[typ] = &DecodeCustomType{fun: fn, fields: make([]*DecodeCustomTypeField, 0, lenFields)}
+			dec.customTypes[typ] = &decodeCustomType{fun: fn, fields: make([]*decodeCustomTypeField, 0, lenFields)}
 		}
 		if lenFields > 0 {
 			for j := range fields {
 				val := reflect.ValueOf(fields[j])
-				field := &DecodeCustomTypeField{field: val, fun: fn}
+				field := &decodeCustomTypeField{field: val, fun: fn}
 				dec.customTypes[typ].fields = append(dec.customTypes[typ].fields, field)
 			}
 		}
@@ -101,7 +103,7 @@ func (dec *Decoder) RegisterCustomType(fn DecodeCustomTypeFunc, types []interfac
 	return dec
 }
 
-// NewDecoder creates a new instance of Decoder
+// NewDecoder creates a new instance of Decoder.
 func NewDecoder(opts *DecoderOptions) *Decoder {
 	dec := &Decoder{opts: opts}
 	if dec.opts == nil {
@@ -113,22 +115,24 @@ func NewDecoder(opts *DecoderOptions) *Decoder {
 	return dec
 }
 
-// Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
+// Decode the url.Values and populate the destination dst, which must be a
+// pointer.
 func (dec Decoder) Decode(vs url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr {
-		return newError(fmt.Errorf("the value passed for decode is not a pointer but a %v", main.Kind()))
+		return newError("Decode: dst %q is not a pointer", main.Kind())
 	}
 	dec.main = main.Elem()
 	dec.formValues = vs
 	return dec.init()
 }
 
-// Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
+// Decode the url.Values and populate the destination dst, which must be a
+// pointer.
 func Decode(vs url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr {
-		return newError(fmt.Errorf("the value passed for decode is not a pointer but a %v", main.Kind()))
+		return newError("Decode: dst %q is not a pointer", main.Kind())
 	}
 	dec := &Decoder{
 		main:       main.Elem(),
@@ -278,13 +282,13 @@ func (dec *Decoder) traverse() error {
 		case reflect.Array:
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError(fmt.Errorf("the index of array is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
+				return newError("array index is not a numberf for field %q in path %q: %v", dec.field, dec.path, err)
 			}
 			dec.curr = dec.curr.Index(index)
 		case reflect.Slice:
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError(fmt.Errorf("the index of slice is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
+				return newError("slice index is not a number for field %q in path %q: %v", dec.field, dec.path, err)
 			}
 			if dec.curr.Len() <= index {
 				dec.expandSlice(index + 1)
@@ -293,7 +297,7 @@ func (dec *Decoder) traverse() error {
 		case reflect.Map:
 			dec.traverseInMap(false)
 		default:
-			return newError(fmt.Errorf("the field \"%v\" in path \"%v\" has a index for array but it is a %v", dec.field, dec.path, dec.curr.Kind()))
+			return newError("%q in path %q has an array index but it is a %v", dec.field, dec.path, dec.curr.Kind())
 		}
 		dec.bracket = ""
 	}
@@ -380,7 +384,7 @@ func (dec *Decoder) decode() error {
 			// has index, so to decode value by index indicated
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError(fmt.Errorf("the index of array is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
+				return newError("array index is not a numberf for field %q in path %q: %v", dec.field, dec.path, err)
 			}
 			dec.curr = dec.curr.Index(index)
 			return dec.decode()
@@ -397,7 +401,7 @@ func (dec *Decoder) decode() error {
 			// has index, so to decode value by index indicated
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError(fmt.Errorf("the index of slice is not a number in the field \"%v\" of path \"%v\"", dec.field, dec.path))
+				return newError("slice index is not a number for field %q in path %q: %v", dec.field, dec.path, err)
 			}
 			// only for slices
 			if dec.curr.Len() <= index {
@@ -410,19 +414,19 @@ func (dec *Decoder) decode() error {
 		dec.curr.SetString(dec.values[0])
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if num, err := strconv.ParseInt(dec.values[0], 10, 64); err != nil {
-			return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" should be a valid signed integer number", dec.field, dec.path))
+			return newError("could not parse number for field %q in path %q: %v", dec.field, dec.path, err)
 		} else {
 			dec.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if num, err := strconv.ParseUint(dec.values[0], 10, 64); err != nil {
-			return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" should be a valid unsigned integer number", dec.field, dec.path))
+			return newError("could not parse number for field %q in path %q: %v", dec.field, dec.path, err)
 		} else {
 			dec.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
 		if num, err := strconv.ParseFloat(dec.values[0], dec.curr.Type().Bits()); err != nil {
-			return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" should be a valid float number", dec.field, dec.path))
+			return newError("could not parse float for field %q in path %q: %v", dec.field, dec.path, err)
 		} else {
 			dec.curr.SetFloat(num)
 		}
@@ -454,14 +458,14 @@ func (dec *Decoder) decode() error {
 				var err error
 				t, err = time.Parse("2006-01-02", dec.values[0])
 				if err != nil {
-					return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" is not a valid datetime", dec.field, dec.path))
+					return newError("could not parse field %q in path %q: %v", dec.field, dec.path, err)
 				}
 			}
 			dec.curr.Set(reflect.ValueOf(t))
 		case url.URL:
 			u, err := url.Parse(dec.values[0])
 			if err != nil {
-				return newError(fmt.Errorf("the value of field \"%v\" in path \"%v\" is not a valid url", dec.field, dec.path))
+				return newError("could not parse field %q in path %q: %v", dec.field, dec.path, err)
 			}
 			dec.curr.Set(reflect.ValueOf(*u))
 		default:
@@ -477,14 +481,14 @@ func (dec *Decoder) decode() error {
 					return nil
 				}
 			}
-			return newError(fmt.Errorf("not supported type for field \"%v\" in path \"%v\". Maybe you should to include it the UnmarshalText interface or register it using custom type?", dec.field, dec.path))
+			return newError("unsupported type for field %q in path %q. Maybe you should to include it the UnmarshalText interface or register it using custom type?", dec.field, dec.path)
 		}
 	default:
 		if dec.opts.IgnoreUnknownKeys {
 			return nil
 		}
 
-		return newError(fmt.Errorf("not supported type for field \"%v\" in path \"%v\"", dec.field, dec.path))
+		return newError("unsupported type for field %q in path %q", dec.field, dec.path)
 	}
 
 	return nil
@@ -541,7 +545,7 @@ func (dec *Decoder) findStructField() error {
 	if dec.opts.IgnoreUnknownKeys {
 		return nil
 	}
-	return newError(fmt.Errorf("not found the field \"%v\" in the path \"%v\"", dec.field, dec.path))
+	return newError("could not find the field %q in the path %q", dec.field, dec.path)
 }
 
 // expandSlice expands the length and capacity of the current slice
