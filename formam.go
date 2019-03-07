@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -526,7 +527,7 @@ func (dec *Decoder) findStructField() error {
 			// (a field with same name in the current struct should have preference over anonymous struct)
 			anon = dec.curr
 			dec.curr = tmp
-		} else if dec.field == field.Tag.Get(dec.opts.TagName) {
+		} else if dec.field == getTagName(field.Tag, dec.opts.TagName) {
 			// is not found yet, then retry by its tag name "formam"
 			dec.curr = dec.curr.Field(i)
 			return nil
@@ -619,4 +620,12 @@ func (dec *Decoder) isUnmarshalText(v reflect.Value) (bool, error) {
 	}
 	// return result
 	return true, m.UnmarshalText([]byte(dec.values[0]))
+}
+
+func getTagName(t reflect.StructTag, tagName string) string {
+	tag := t.Get(tagName)
+	if p := strings.Index(tag, ","); p != -1 {
+		return tag[:p]
+	}
+	return tag
 }
