@@ -147,7 +147,8 @@ type TestStruct struct {
 	UnmarshalTextUUID   UUID
 
 	// tag
-	Tag string `formam:"tag"`
+	Tag    string `formam:"tag"`
+	TagOpt string `formam:"tagopt,x"`
 
 	// time
 	Time time.Time
@@ -253,7 +254,8 @@ var vals = url.Values{
 	"UnmarshalTextUUID":   []string{"11e5bf2d3e403a8c86740023dffe5350"},
 
 	// tag
-	"tag": []string{"string placed by tag"},
+	"tag":    []string{"string placed by tag"},
+	"tagopt": []string{"string placed by tagopt"},
 
 	// time
 	"Time": []string{"2016-06-12"},
