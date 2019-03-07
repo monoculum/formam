@@ -2,6 +2,7 @@ package formam
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 type Error struct {
@@ -21,4 +22,6 @@ func (s *Error) Cause() error {
 	return s.err
 }
 
-func newError(err error) *Error { return &Error{err} }
+func newError(format string, a ...interface{}) error {
+	return &Error{fmt.Errorf(format, a...)}
+}

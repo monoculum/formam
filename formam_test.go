@@ -1,4 +1,4 @@
-package formam
+package formam_test
 
 import (
 	"encoding/hex"
@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/monoculum/formam"
 )
 
 type Text string
@@ -280,7 +282,7 @@ func TestDecodeInStruct(t *testing.T) {
 	var m TestStruct
 	m.InterfaceStruct = &InterfaceStruct{}
 
-	dec := NewDecoder(nil).RegisterCustomType(func(vals []string) (interface{}, error) {
+	dec := formam.NewDecoder(nil).RegisterCustomType(func(vals []string) (interface{}, error) {
 		return FieldString("value changed by custom type"), nil
 	}, []interface{}{FieldString("")}, nil)
 
@@ -704,7 +706,7 @@ var sliceValues = url.Values{
 
 func TestDecodeInSlice(t *testing.T) {
 	var t2 TestSlice
-	err := Decode(sliceValues, &t2)
+	err := formam.Decode(sliceValues, &t2)
 	if err != nil {
 		t.Error(err)
 	}
@@ -722,7 +724,7 @@ func TestIgnoreUnknownKeys(t *testing.T) {
 		"Children.": []string{"Bart", "Lisa"},
 		"Job[":      []string{"Safety inspector"},
 	}
-	dec := NewDecoder(&DecoderOptions{
+	dec := formam.NewDecoder(&formam.DecoderOptions{
 		IgnoreUnknownKeys: true,
 	})
 	err := dec.Decode(vals, &s)
@@ -743,7 +745,7 @@ func TestIgnoreBracketedKeysError(t *testing.T) {
 		"[Wife]":    []string{"Marge"},
 		"His[Wife]": []string{"Marge"},
 	}
-	dec := NewDecoder(&DecoderOptions{})
+	dec := formam.NewDecoder(&formam.DecoderOptions{})
 	err := dec.Decode(vals, &s)
 	if err == nil {
 		t.Error("error is not nil")
@@ -757,7 +759,7 @@ func TestIgnoreBracketedKeysIgnoreError(t *testing.T) {
 		"[Wife]":    []string{"Marge"},
 		"His[Wife]": []string{"Marge"},
 	}
-	dec := NewDecoder(&DecoderOptions{
+	dec := formam.NewDecoder(&formam.DecoderOptions{
 		IgnoreUnknownKeys: true,
 	})
 	err := dec.Decode(vals, &s)
@@ -775,7 +777,7 @@ func TestIgnoreBracketedKeysIgnoreStruct(t *testing.T) {
 		"[Wife]":    []string{"Marge"},
 		"His[Wife]": []string{"Marge"},
 	}
-	dec := NewDecoder(&DecoderOptions{
+	dec := formam.NewDecoder(&formam.DecoderOptions{
 		IgnoreUnknownKeys: true,
 	})
 	err := dec.Decode(vals, &s)
@@ -796,7 +798,7 @@ func TestEmptyString(t *testing.T) {
 	vals := url.Values{
 		"Name": []string{""},
 	}
-	dec := NewDecoder(&DecoderOptions{})
+	dec := formam.NewDecoder(&formam.DecoderOptions{})
 	err := dec.Decode(vals, &s)
 	if err != nil {
 		t.Error(err)
@@ -822,7 +824,7 @@ func TestIgnoredStructTag(t *testing.T) {
 		"Phone":    []string{"555-333-222"},
 	}
 
-	dec := NewDecoder(&DecoderOptions{})
+	dec := formam.NewDecoder(&formam.DecoderOptions{})
 	err := dec.Decode(vals, &s)
 	if err != nil {
 		t.Error(err)
