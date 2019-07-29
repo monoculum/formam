@@ -120,7 +120,7 @@ func NewDecoder(opts *DecoderOptions) *Decoder {
 func (dec Decoder) Decode(vs url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr {
-		return newError("Decode: dst %q is not a pointer", main.Kind())
+		return newError(ErrCodeNotAPointer, "", "", "dst %q is not a pointer", main.Kind())
 	}
 	dec.main = main.Elem()
 	dec.formValues = vs
@@ -132,7 +132,7 @@ func (dec Decoder) Decode(vs url.Values, dst interface{}) error {
 func Decode(vs url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr {
-		return newError("Decode: dst %q is not a pointer", main.Kind())
+		return newError(ErrCodeNotAPointer, "", "", "dst %q is not a pointer", main.Kind())
 	}
 	dec := &Decoder{
 		main:       main.Elem(),
@@ -287,13 +287,13 @@ func (dec *Decoder) traverse() error {
 		case reflect.Array:
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError("array index is not a numberf for field %q in path %q: %v", dec.field, dec.path, err)
+				return newError(ErrCodeArrayIndex, dec.field, dec.path, "array index is not a number: %s", err)
 			}
 			dec.curr = dec.curr.Index(index)
 		case reflect.Slice:
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError("slice index is not a number for field %q in path %q: %v", dec.field, dec.path, err)
+				return newError(ErrCodeArrayIndex, dec.field, dec.path, "slice index is not a number: %s", err)
 			}
 			if dec.curr.Len() <= index {
 				dec.expandSlice(index + 1)
@@ -302,7 +302,7 @@ func (dec *Decoder) traverse() error {
 		case reflect.Map:
 			dec.traverseInMap(false)
 		default:
-			return newError("%q in path %q has an array index but it is a %v", dec.field, dec.path, dec.curr.Kind())
+			return newError(ErrCodeArrayIndex, dec.field, dec.path, "has an array index but it is a %v", dec.curr.Kind())
 		}
 		dec.bracket = ""
 	}
@@ -389,7 +389,7 @@ func (dec *Decoder) decode() error {
 			// has index, so to decode value by index indicated
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError("array index is not a numberf for field %q in path %q: %v", dec.field, dec.path, err)
+				return newError(ErrCodeArrayIndex, dec.field, dec.path, "array index is not a number: %s", err)
 			}
 			dec.curr = dec.curr.Index(index)
 			return dec.decode()
@@ -406,7 +406,7 @@ func (dec *Decoder) decode() error {
 			// has index, so to decode value by index indicated
 			index, err := strconv.Atoi(dec.bracket)
 			if err != nil {
-				return newError("slice index is not a number for field %q in path %q: %v", dec.field, dec.path, err)
+				return newError(ErrCodeArrayIndex, dec.field, dec.path, "slice index is not a number: %s", err)
 			}
 			// only for slices
 			if dec.curr.Len() <= index {
@@ -419,19 +419,19 @@ func (dec *Decoder) decode() error {
 		dec.curr.SetString(dec.values[0])
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if num, err := strconv.ParseInt(dec.values[0], 10, 64); err != nil {
-			return newError("could not parse number for field %q in path %q: %v", dec.field, dec.path, err)
+			return newError(ErrCodeConversion, dec.field, dec.path, "could not parse number: %s", err)
 		} else {
 			dec.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if num, err := strconv.ParseUint(dec.values[0], 10, 64); err != nil {
-			return newError("could not parse number for field %q in path %q: %v", dec.field, dec.path, err)
+			return newError(ErrCodeConversion, dec.field, dec.path, "could not parse number: %s", err)
 		} else {
 			dec.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
 		if num, err := strconv.ParseFloat(dec.values[0], dec.curr.Type().Bits()); err != nil {
-			return newError("could not parse float for field %q in path %q: %v", dec.field, dec.path, err)
+			return newError(ErrCodeConversion, dec.field, dec.path, "could not parse float: %s", err)
 		} else {
 			dec.curr.SetFloat(num)
 		}
@@ -463,14 +463,14 @@ func (dec *Decoder) decode() error {
 				var err error
 				t, err = time.Parse("2006-01-02", dec.values[0])
 				if err != nil {
-					return newError("could not parse field %q in path %q: %v", dec.field, dec.path, err)
+					return newError(ErrCodeConversion, dec.field, dec.path, "could not parse field: %s", err)
 				}
 			}
 			dec.curr.Set(reflect.ValueOf(t))
 		case url.URL:
 			u, err := url.Parse(dec.values[0])
 			if err != nil {
-				return newError("could not parse field %q in path %q: %v", dec.field, dec.path, err)
+				return newError(ErrCodeConversion, dec.field, dec.path, "could not parse field: %s", err)
 			}
 			dec.curr.Set(reflect.ValueOf(*u))
 		default:
@@ -486,14 +486,15 @@ func (dec *Decoder) decode() error {
 					return nil
 				}
 			}
-			return newError("unsupported type for field %q in path %q. Maybe you should to include it the UnmarshalText interface or register it using custom type?", dec.field, dec.path)
+			return newError(ErrCodeUnknownType, dec.field, dec.path,
+				"unsupported type; maybe include it the UnmarshalText interface or register it using custom type?")
 		}
 	default:
 		if dec.opts.IgnoreUnknownKeys {
 			return nil
 		}
 
-		return newError("unsupported type for field %q in path %q", dec.field, dec.path)
+		return newError(ErrCodeUnknownType, dec.field, dec.path, "unsupported type")
 	}
 
 	return nil
@@ -550,7 +551,7 @@ func (dec *Decoder) findStructField() error {
 	if dec.opts.IgnoreUnknownKeys {
 		return nil
 	}
-	return newError("could not find the field %q in the path %q", dec.field, dec.path)
+	return newError(ErrCodeUnknownField, dec.field, dec.path, "unknown field")
 }
 
 // expandSlice expands the length and capacity of the current slice
