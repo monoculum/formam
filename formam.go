@@ -212,7 +212,12 @@ func (dec *Decoder) analyzePath() (err error) {
 				// and put as false inBracket and pass the value of bracket to dec.key
 				inBracket = false
 				bracketClosed = true
-				dec.bracket = dec.path[lastPos:endPos]
+				if endPos == 0 { // foo[] without number.
+					dec.bracket = dec.path[lastPos:i]
+				} else {
+					dec.bracket = dec.path[lastPos:endPos]
+				}
+
 				lastPos = i + 1
 				if err = dec.traverse(); err != nil {
 					return

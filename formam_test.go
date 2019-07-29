@@ -842,3 +842,31 @@ func TestIgnoredStructTag(t *testing.T) {
 		t.Errorf("Expected new phone number '555-333-222' but got %s", s.Phone)
 	}
 }
+
+// Test for #7
+func TestPanic(t *testing.T) {
+	s := struct {
+		Foo []string `formam:"foo"`
+	}{}
+
+	vals := url.Values{
+		"foo[]": []string{"5", "6"},
+	}
+
+	dec := formam.NewDecoder(&formam.DecoderOptions{})
+	err := dec.Decode(vals, &s)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(s.Foo) != 2 {
+		t.Fatalf("len(s.Foo) is %d", len(s.Foo))
+	}
+	if s.Foo[0] != "5" {
+		t.Errorf("s.Foo[0] is %#v", s.Foo[0])
+	}
+	if s.Foo[1] != "6" {
+		t.Errorf("s.Foo[1] is %#v", s.Foo[1])
+	}
+
+}
