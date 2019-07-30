@@ -2,7 +2,7 @@ formam
 ======
 
 A Go package to decode HTTP form and query parameters.
-The only requirement is [Go 1.2](http://golang.org/doc/go1.2) or later.
+The only requirement is [Go 1.10](http://golang.org/doc/go1.10) or later.
 
 [![Build Status](https://travis-ci.org/monoculum/formam.png?branch=master)](https://travis-ci.org/monoculum/formam)
 [![GoDoc](https://godoc.org/github.com/monoculum/formam?status.png)](https://godoc.org/github.com/monoculum/formam)
