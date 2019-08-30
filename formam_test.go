@@ -870,3 +870,28 @@ func TestPanic(t *testing.T) {
 	}
 
 }
+
+// #25
+func TestOverflow(t *testing.T) {
+	s := struct {
+		N uint8
+	}{}
+
+	vals := url.Values{
+		"N": []string{"300"},
+	}
+
+	dec := formam.NewDecoder(&formam.DecoderOptions{})
+	err := dec.Decode(vals, &s)
+	if err == nil {
+		t.Fatalf("error is nil")
+	}
+	if s.N != 0 {
+		t.Fatalf("s.N is %d", s.N)
+	}
+
+	fErr := err.(*formam.Error)
+	if fErr.Code() != formam.ErrCodeRange {
+		t.Fatalf("error code is %d", fErr.Code())
+	}
+}
