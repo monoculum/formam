@@ -418,20 +418,32 @@ func (dec *Decoder) decode() error {
 	case reflect.String:
 		dec.curr.SetString(dec.values[0])
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if num, err := strconv.ParseInt(dec.values[0], 10, 64); err != nil {
-			return newError(ErrCodeConversion, dec.field, dec.path, "could not parse number: %s", err)
+		if num, err := strconv.ParseInt(dec.values[0], 10, dec.curr.Type().Bits()); err != nil {
+			code := ErrCodeConversion
+			if err, ok := err.(*strconv.NumError); ok && err.Err == strconv.ErrRange {
+				code = ErrCodeRange
+			}
+			return newError(code, dec.field, dec.path, "could not parse number: %s", err)
 		} else {
 			dec.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		if num, err := strconv.ParseUint(dec.values[0], 10, 64); err != nil {
-			return newError(ErrCodeConversion, dec.field, dec.path, "could not parse number: %s", err)
+		if num, err := strconv.ParseUint(dec.values[0], 10, dec.curr.Type().Bits()); err != nil {
+			code := ErrCodeConversion
+			if err, ok := err.(*strconv.NumError); ok && err.Err == strconv.ErrRange {
+				code = ErrCodeRange
+			}
+			return newError(code, dec.field, dec.path, "could not parse number: %s", err)
 		} else {
 			dec.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
 		if num, err := strconv.ParseFloat(dec.values[0], dec.curr.Type().Bits()); err != nil {
-			return newError(ErrCodeConversion, dec.field, dec.path, "could not parse float: %s", err)
+			code := ErrCodeConversion
+			if err, ok := err.(*strconv.NumError); ok && err.Err == strconv.ErrRange {
+				code = ErrCodeRange
+			}
+			return newError(code, dec.field, dec.path, "could not parse float: %s", err)
 		} else {
 			dec.curr.SetFloat(num)
 		}
