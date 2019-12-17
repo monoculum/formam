@@ -895,3 +895,31 @@ func TestOverflow(t *testing.T) {
 		t.Fatalf("error code is %d", fErr.Code())
 	}
 }
+
+// #28
+func TestArrayIgnore(t *testing.T) {
+	type Users []struct {
+		Email string `form:"Email"`
+	}
+
+	vals := url.Values{
+		"[0].Email":          {"a@a.a"},
+		"[1].Email":          {"b@b.b"},
+		"authenticity_token": {"xxx"},
+	}
+
+	var u Users
+	dec := formam.NewDecoder(&formam.DecoderOptions{
+		IgnoreUnknownKeys: true,
+	})
+	err := dec.Decode(vals, &u)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := fmt.Sprintf("%v", u)
+	want := `[{a@a.a} {b@b.b}]`
+	if out != want {
+		t.Fatalf("\nout:  %s\nwant: %s", out, want)
+	}
+}
