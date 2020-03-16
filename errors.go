@@ -46,6 +46,11 @@ func (s Error) Code() uint8 {
 	return s.code
 }
 
+// Path for this error.
+func (s Error) Path() string {
+	return s.path
+}
+
 // Cause implements the causer interface from github.com/pkg/errors.
 func (s *Error) Cause() error {
 	return s.err
