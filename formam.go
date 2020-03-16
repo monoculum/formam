@@ -217,7 +217,6 @@ func (dec *Decoder) analyzePath() (err error) {
 				} else {
 					dec.bracket = dec.path[lastPos:endPos]
 				}
-
 				lastPos = i + 1
 				if err = dec.traverse(); err != nil {
 					return
@@ -505,7 +504,6 @@ func (dec *Decoder) decode() error {
 		if dec.opts.IgnoreUnknownKeys {
 			return nil
 		}
-
 		return newError(ErrCodeUnknownType, dec.field, dec.path, "unsupported type")
 	}
 
@@ -555,19 +553,28 @@ func (dec *Decoder) findStructField() error {
 			return nil
 		}
 	}
+
 	if anon.IsValid() {
 		dec.curr = anon
 		return nil
 	}
-
 	if dec.opts.IgnoreUnknownKeys {
 		return nil
 	}
+
 	return newError(ErrCodeUnknownField, dec.field, dec.path, "unknown field")
 }
 
-// expandSlice expands the length and capacity of the current slice
+// expandSlice expands the length and capacity of the current slice.
 func (dec *Decoder) expandSlice(length int) {
+	// check if the length passed by arguments is greater
+	// than current length.
+	// If the length is not greater than current,
+	// then return and not expand the slice
+	currLen := dec.curr.Len()
+	if currLen > length {
+		return
+	}
 	n := reflect.MakeSlice(dec.curr.Type(), length, length)
 	reflect.Copy(n, dec.curr)
 	dec.curr.Set(n)
