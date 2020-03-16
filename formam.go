@@ -651,6 +651,7 @@ func (dec *Decoder) isUnmarshalText(v reflect.Value) (bool, error) {
 	return true, m.UnmarshalText([]byte(dec.values[0]))
 }
 
+// getTagName get tag by the name passed by argument
 func getTagName(t reflect.StructTag, tagName string) string {
 	tag := t.Get(tagName)
 	if p := strings.Index(tag, ","); p != -1 {
