@@ -189,7 +189,8 @@ func (dec Decoder) init() error {
 	return nil
 }
 
-// analyzePath analyzes the current path to walk through it
+// analyzePath analyzes the current path to walk through it.
+// For example: users[0].name
 func (dec *Decoder) analyzePath() (err error) {
 	inBracket := false
 	bracketClosed := false
@@ -308,7 +309,7 @@ func (dec *Decoder) traverse() error {
 	return nil
 }
 
-// walkMap puts in d.curr the map concrete for decode the current value
+// walkMap puts in Decoder.curr the map concrete for decode the current value
 func (dec *Decoder) traverseInMap(byField bool) {
 	n := dec.curr.Type()
 	makeAndAppend := func() {
