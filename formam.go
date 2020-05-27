@@ -248,10 +248,13 @@ func (dec *Decoder) analyzePath() (err error) {
 			continue
 		}
 	}
-	// last field of path
-	dec.field = dec.path[lastPos:]
 
-	return dec.end()
+	// last field of path, traverse it and decode the value in it
+	dec.field = dec.path[lastPos:]
+	if err := dec.traverse(); err != nil {
+		return err
+	}
+	return dec.decode()
 }
 
 // walk traverses the current path until to the last field
@@ -265,6 +268,7 @@ func (dec *Decoder) traverse() error {
 				return err
 			}
 		case reflect.Map:
+			// leave backward compatibility for access to maps by .
 			dec.traverseInMap(true)
 		}
 		dec.field = ""
@@ -300,6 +304,7 @@ func (dec *Decoder) traverse() error {
 			}
 			dec.curr = dec.curr.Index(index)
 		case reflect.Map:
+			// leave backward compatibility for access to maps by .
 			dec.traverseInMap(false)
 		default:
 			return newError(ErrCodeArrayIndex, dec.field, dec.path, "has an array index but it is a %v", dec.curr.Kind())
@@ -343,20 +348,6 @@ func (dec *Decoder) traverseInMap(byField bool) {
 			dec.curr = a.value
 		}
 	}
-}
-
-// end finds the last field for decode its value correspondent
-func (dec *Decoder) end() error {
-	switch dec.curr.Kind() {
-	case reflect.Struct:
-		if err := dec.findStructField(); err != nil {
-			return err
-		}
-	case reflect.Map:
-		// leave backward compatibility for access to maps by .
-		dec.traverseInMap(true)
-	}
-	return dec.decode()
 }
 
 // decode sets the value in the field
