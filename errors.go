@@ -14,6 +14,7 @@ const (
 	ErrCodeUnknownType               // Unknown type.
 	ErrCodeUnknownField              // No struct field for passed parameter (will never be used if IgnoreUnknownKeys is set).
 	ErrCodeRange                     // Number is out of range (e.g. parsing 300 in uint8 would overflow).
+	ErrCodeArraySize                 // Array longer than MaxSize.
 )
 
 type Error struct {

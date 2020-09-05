@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -922,4 +923,65 @@ func TestArrayIgnore(t *testing.T) {
 	if out != want {
 		t.Fatalf("\nout:  %s\nwant: %s", out, want)
 	}
+}
+
+// #31
+func TestArrayLength(t *testing.T) {
+	tests := []struct {
+		arrayLen  int
+		maxSize   int
+		wantError string
+	}{
+		{15000, 0, ""},
+		{15999, 0, ""},
+		{16000, 0, "array size 16001 is longer than MaxSize 16000"},
+		{8, 8, "array size 9 is longer than MaxSize 8"},
+
+		{26000, -1, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			type Malicious []struct {
+				X string
+			}
+
+			vals := url.Values{
+				fmt.Sprintf("[%d].X", tt.arrayLen): {"yeah nah"},
+			}
+
+			var m Malicious
+			dec := formam.NewDecoder(&formam.DecoderOptions{MaxSize: tt.maxSize})
+			err := dec.Decode(vals, &m)
+
+			if !errorContains(err, tt.wantError) {
+				t.Fatalf("wrong error: %s", err)
+			}
+
+			if err == nil {
+				if len(m) != tt.arrayLen+1 {
+					t.Errorf("%d != %d", len(m), tt.arrayLen+1)
+				}
+			} else {
+				if len(m) != 0 {
+					t.Errorf("len(n) is not 0: %d", len(m))
+				}
+			}
+		})
+	}
+}
+
+// errorContains checks if the error message in out contains the text in
+// want.
+//
+// This is safe when out is nil. Use an empty string for want if you want to
+// test that err is nil.
+func errorContains(out error, want string) bool {
+	if out == nil {
+		return want == ""
+	}
+	if want == "" {
+		return false
+	}
+	return strings.Contains(out.Error(), want)
 }
