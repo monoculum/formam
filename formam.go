@@ -3,6 +3,7 @@ package formam
 
 import (
 	"encoding"
+	"errors"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -10,7 +11,11 @@ import (
 	"time"
 )
 
-const tagName = "formam"
+// Default options.
+const (
+	tagName = "formam"
+	maxSize = 16000
+)
 
 // pathMap holds the values of a map with its key and values correspondent
 type pathMap struct {
@@ -79,6 +84,13 @@ type DecoderOptions struct {
 	// Ignore unknown form fields. By default unknown fields are an error
 	// (although all valid keys will still be decoded).
 	IgnoreUnknownKeys bool
+
+	// The maximum array size that formam will create. This is limited to
+	// prevent malicious input to create huge arrays to starve the server of
+	// memory.
+	//
+	// The default is 16,000; set to -1 to disable.
+	MaxSize int
 }
 
 // RegisterCustomType registers a functions for decoding custom types.
@@ -112,6 +124,9 @@ func NewDecoder(opts *DecoderOptions) *Decoder {
 	if dec.opts.TagName == "" {
 		dec.opts.TagName = tagName
 	}
+	if dec.opts.MaxSize == 0 {
+		dec.opts.MaxSize = maxSize
+	}
 	return dec
 }
 
@@ -139,6 +154,7 @@ func Decode(vs url.Values, dst interface{}) error {
 		formValues: vs,
 		opts: &DecoderOptions{
 			TagName: tagName,
+			MaxSize: maxSize,
 		},
 	}
 	return dec.init()
@@ -300,7 +316,10 @@ func (dec *Decoder) traverse() error {
 				return newError(ErrCodeArrayIndex, dec.field, dec.path, "slice index is not a number: %s", err)
 			}
 			if dec.curr.Len() <= index {
-				dec.expandSlice(index + 1)
+				err := dec.expandSlice(index + 1)
+				if err != nil {
+					return newError(ErrCodeArraySize, dec.field, dec.path, "%s", err)
+				}
 			}
 			dec.curr = dec.curr.Index(index)
 		case reflect.Map:
@@ -389,7 +408,10 @@ func (dec *Decoder) decode() error {
 		if dec.bracket == "" {
 			// not has index, so to decode all values in the slice
 			// only for slices
-			dec.expandSlice(len(dec.values))
+			err := dec.expandSlice(len(dec.values))
+			if err != nil {
+				return newError(ErrCodeArraySize, dec.field, dec.path, "%s", err)
+			}
 			if err := dec.setValues(); err != nil {
 				return err
 			}
@@ -401,7 +423,10 @@ func (dec *Decoder) decode() error {
 			}
 			// only for slices
 			if dec.curr.Len() <= index {
-				dec.expandSlice(index + 1)
+				err := dec.expandSlice(index + 1)
+				if err != nil {
+					return newError(ErrCodeArraySize, dec.field, dec.path, "%s", err)
+				}
 			}
 			dec.curr = dec.curr.Index(index)
 			return dec.decode()
@@ -558,18 +583,22 @@ func (dec *Decoder) findStructField() error {
 }
 
 // expandSlice expands the length and capacity of the current slice.
-func (dec *Decoder) expandSlice(length int) {
-	// check if the length passed by arguments is greater
-	// than current length.
-	// If the length is not greater than current,
-	// then return and not expand the slice
+func (dec *Decoder) expandSlice(length int) error {
+	// Check if the length passed by arguments is greater than the current
+	// length.
 	currLen := dec.curr.Len()
 	if currLen > length {
-		return
+		return nil
 	}
+
+	if dec.opts.MaxSize >= 0 && length > dec.opts.MaxSize {
+		return errors.New("array size " + strconv.Itoa(length) + " is longer than MaxSize " + strconv.Itoa(dec.opts.MaxSize))
+	}
+
 	n := reflect.MakeSlice(dec.curr.Type(), length, length)
 	reflect.Copy(n, dec.curr)
 	dec.curr.Set(n)
+	return nil
 }
 
 // setValues set the values in current slice/array
