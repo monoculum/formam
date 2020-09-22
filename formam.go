@@ -81,6 +81,9 @@ type DecoderOptions struct {
 	// Prefer UnmarshalText over custom types.
 	PrefUnmarshalText bool
 
+	// Disable UnmarshalText interface
+	DisableUnmarshalText bool
+
 	// Ignore unknown form fields. By default unknown fields are an error
 	// (although all valid keys will still be decoded).
 	IgnoreUnknownKeys bool
@@ -371,20 +374,27 @@ func (dec *Decoder) traverseInMap(byField bool) {
 
 // decode sets the value in the field
 func (dec *Decoder) decode() error {
-	// check if has UnmarshalText method or a custom function to decode it
-	if dec.opts.PrefUnmarshalText {
-		if ok, err := dec.isUnmarshalText(dec.curr); ok || err != nil {
-			return err
-		}
+	// if DisableUnmarshalText is true then only use customType if available
+	if dec.opts.DisableUnmarshalText {
 		if ok, err := dec.isCustomType(); ok || err != nil {
 			return err
 		}
 	} else {
-		if ok, err := dec.isCustomType(); ok || err != nil {
-			return err
-		}
-		if ok, err := dec.isUnmarshalText(dec.curr); ok || err != nil {
-			return err
+		// check if has UnmarshalText method or a custom function to decode it
+		if dec.opts.PrefUnmarshalText {
+			if ok, err := dec.isUnmarshalText(dec.curr); ok || err != nil {
+				return err
+			}
+			if ok, err := dec.isCustomType(); ok || err != nil {
+				return err
+			}
+		} else {
+			if ok, err := dec.isCustomType(); ok || err != nil {
+				return err
+			}
+			if ok, err := dec.isUnmarshalText(dec.curr); ok || err != nil {
+				return err
+			}
 		}
 	}
 
@@ -654,6 +664,8 @@ var (
 
 // isUnmarshalText returns a boolean and error. The boolean is true if the
 // field's type implements TextUnmarshaler, and false if not.
+// If the field implements TextUnmarshaler, then it is used to decode the value
+// in the field.
 func (dec *Decoder) isUnmarshalText(v reflect.Value) (bool, error) {
 	// check if implements the interface
 	m, ok := v.Interface().(encoding.TextUnmarshaler)
