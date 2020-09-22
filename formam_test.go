@@ -971,6 +971,47 @@ func TestArrayLength(t *testing.T) {
 	}
 }
 
+type StringWithUnmarshalText string
+
+func (s *StringWithUnmarshalText) UnmarshalText(data []byte) error {
+	*s = "string by UnmarshalText"
+	return nil
+}
+
+func TestEnableUnmarshalText(t *testing.T) {
+	s := struct {
+		Text StringWithUnmarshalText
+	}{}
+	vals := url.Values{
+		"Text": []string{"string by form"},
+	}
+	dec := formam.NewDecoder(&formam.DecoderOptions{})
+	if err := dec.Decode(vals, &s); err != nil {
+		t.Fatalf("error when decode %s", err)
+	}
+	if s.Text != "string by UnmarshalText" {
+		t.Errorf("the UnmarshalText hasn't been called")
+	}
+}
+
+func TestDisableUnmarshalText(t *testing.T) {
+	s := struct {
+		Text StringWithUnmarshalText
+	}{}
+	vals := url.Values{
+		"Text": []string{"string by form"},
+	}
+	dec := formam.NewDecoder(&formam.DecoderOptions{
+		DisableUnmarshalText: true,
+	})
+	if err := dec.Decode(vals, &s); err != nil {
+		t.Fatalf("error when decode %s", err)
+	}
+	if s.Text != "string by form" {
+		t.Errorf("the UnmarshalText has been called")
+	}
+}
+
 // errorContains checks if the error message in out contains the text in
 // want.
 //
