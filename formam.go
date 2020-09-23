@@ -447,35 +447,35 @@ func (dec *Decoder) decode() error {
 	case reflect.String:
 		dec.curr.SetString(dec.currValues[0])
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if num, err := strconv.ParseInt(dec.currValues[0], 10, dec.curr.Type().Bits()); err != nil {
+		num, err := strconv.ParseInt(dec.currValues[0], 10, dec.curr.Type().Bits())
+		if err != nil {
 			code := ErrCodeConversion
 			if err, ok := err.(*strconv.NumError); ok && err.Err == strconv.ErrRange {
 				code = ErrCodeRange
 			}
 			return newError(code, dec.field, dec.path, "could not parse number: %s", err)
-		} else {
-			dec.curr.SetInt(num)
 		}
+		dec.curr.SetInt(num)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		if num, err := strconv.ParseUint(dec.currValues[0], 10, dec.curr.Type().Bits()); err != nil {
+		num, err := strconv.ParseUint(dec.currValues[0], 10, dec.curr.Type().Bits())
+		if err != nil {
 			code := ErrCodeConversion
 			if err, ok := err.(*strconv.NumError); ok && err.Err == strconv.ErrRange {
 				code = ErrCodeRange
 			}
 			return newError(code, dec.field, dec.path, "could not parse number: %s", err)
-		} else {
-			dec.curr.SetUint(num)
 		}
+		dec.curr.SetUint(num)
 	case reflect.Float32, reflect.Float64:
-		if num, err := strconv.ParseFloat(dec.currValues[0], dec.curr.Type().Bits()); err != nil {
+		num, err := strconv.ParseFloat(dec.currValues[0], dec.curr.Type().Bits())
+		if err != nil {
 			code := ErrCodeConversion
 			if err, ok := err.(*strconv.NumError); ok && err.Err == strconv.ErrRange {
 				code = ErrCodeRange
 			}
 			return newError(code, dec.field, dec.path, "could not parse float: %s", err)
-		} else {
-			dec.curr.SetFloat(num)
 		}
+		dec.curr.SetFloat(num)
 	case reflect.Bool:
 		switch dec.currValues[0] {
 		case "true", "on", "1", "checked":
