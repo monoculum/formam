@@ -17,6 +17,7 @@ const (
 	ErrCodeArraySize                 // Array longer than MaxSize.
 )
 
+// Error indicates a error produced
 type Error struct {
 	code        uint8
 	field, path string
@@ -38,6 +39,7 @@ func (s *Error) Error() string {
 	return b.String()
 }
 
+// MarshalJSON implements the interface Marshaler
 func (s Error) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.Error())
 }
