@@ -63,9 +63,9 @@ type Decoder struct {
 	curr   reflect.Value
 	values []string
 
-	path    string
-	field   string
-	bracket string
+	path  string
+	field string
+	index string
 	//isKey   bool
 
 	maps pathMaps
@@ -233,12 +233,17 @@ func (dec *Decoder) analyzePath() (err error) {
 				inBracket = false
 				bracketClosed = true
 				if endPos == 0 { // foo[] without number.
-					dec.bracket = dec.path[lastPos:i]
+					dec.index = dec.path[lastPos:i]
 				} else {
-					dec.bracket = dec.path[lastPos:endPos]
+					dec.index = dec.path[lastPos:endPos]
 				}
 				lastPos = i + 1
-				if err = dec.traverse(); err != nil {
+				// traverse the path
+				err = dec.traverse()
+				// flush the index already used by traverse
+				dec.index = ""
+				// check if the "traverse" failed
+				if err != nil {
 					return
 				}
 			} else {
@@ -305,16 +310,16 @@ func (dec *Decoder) traverse() error {
 		dec.curr = dec.curr.Elem()
 	}
 	// check if there is access to slice/array or map (access by [])
-	if dec.bracket != "" {
+	if dec.index != "" {
 		switch dec.curr.Kind() {
 		case reflect.Array:
-			index, err := strconv.Atoi(dec.bracket)
+			index, err := strconv.Atoi(dec.index)
 			if err != nil {
 				return newError(ErrCodeArrayIndex, dec.field, dec.path, "array index is not a number: %s", err)
 			}
 			dec.curr = dec.curr.Index(index)
 		case reflect.Slice:
-			index, err := strconv.Atoi(dec.bracket)
+			index, err := strconv.Atoi(dec.index)
 			if err != nil {
 				return newError(ErrCodeArrayIndex, dec.field, dec.path, "slice index is not a number: %s", err)
 			}
@@ -331,7 +336,6 @@ func (dec *Decoder) traverse() error {
 		default:
 			return newError(ErrCodeArrayIndex, dec.field, dec.path, "has an array index but it is a %v", dec.curr.Kind())
 		}
-		dec.bracket = ""
 	}
 	return nil
 }
@@ -347,7 +351,7 @@ func (dec *Decoder) traverseInMap(byField bool) {
 		if byField {
 			dec.maps = append(dec.maps, &pathMap{dec.curr, dec.field, m, dec.path})
 		} else {
-			dec.maps = append(dec.maps, &pathMap{dec.curr, dec.bracket, m, dec.path})
+			dec.maps = append(dec.maps, &pathMap{dec.curr, dec.index, m, dec.path})
 		}
 		dec.curr = m
 	}
@@ -361,7 +365,7 @@ func (dec *Decoder) traverseInMap(byField bool) {
 		if byField {
 			a = dec.maps.find(dec.curr, dec.field)
 		} else {
-			a = dec.maps.find(dec.curr, dec.bracket)
+			a = dec.maps.find(dec.curr, dec.index)
 		}
 		if a == nil {
 			// the key not exists
@@ -400,14 +404,14 @@ func (dec *Decoder) decode() error {
 
 	switch dec.curr.Kind() {
 	case reflect.Array:
-		if dec.bracket == "" {
+		if dec.index == "" {
 			// not has index, so to decode all values in the slice
 			if err := dec.setValues(); err != nil {
 				return err
 			}
 		} else {
 			// has index, so to decode value by index indicated
-			index, err := strconv.Atoi(dec.bracket)
+			index, err := strconv.Atoi(dec.index)
 			if err != nil {
 				return newError(ErrCodeArrayIndex, dec.field, dec.path, "array index is not a number: %s", err)
 			}
@@ -415,7 +419,7 @@ func (dec *Decoder) decode() error {
 			return dec.decode()
 		}
 	case reflect.Slice:
-		if dec.bracket == "" {
+		if dec.index == "" {
 			// not has index, so to decode all values in the slice
 			// only for slices
 			err := dec.expandSlice(len(dec.values))
@@ -427,7 +431,7 @@ func (dec *Decoder) decode() error {
 			}
 		} else {
 			// has index, so to decode value by index indicated
-			index, err := strconv.Atoi(dec.bracket)
+			index, err := strconv.Atoi(dec.index)
 			if err != nil {
 				return newError(ErrCodeArrayIndex, dec.field, dec.path, "slice index is not a number: %s", err)
 			}
