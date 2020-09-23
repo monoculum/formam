@@ -19,11 +19,10 @@ const (
 
 // pathMap holds the values of a map with its key and values correspondent
 type pathMap struct {
-	ma    reflect.Value
-	key   string
-	value reflect.Value
-
-	path string
+	field reflect.Value // map
+	key   string        // key of map
+	value reflect.Value // value of map
+	path  string        // form's path associated to map
 }
 
 // pathMaps holds the values for each key
@@ -32,7 +31,7 @@ type pathMaps []*pathMap
 // find finds and gets the value by the given key
 func (m pathMaps) find(id reflect.Value, key string) *pathMap {
 	for i := range m {
-		if m[i].ma == id && m[i].key == key {
+		if m[i].field == id && m[i].key == key {
 			return m[i]
 		}
 	}
@@ -44,33 +43,33 @@ type DecodeCustomTypeFunc func([]string) (interface{}, error)
 
 // decodeCustomTypeField is registered for a specific field.
 type decodeCustomTypeField struct {
+	fn    DecodeCustomTypeFunc
 	field reflect.Value
-	fun   DecodeCustomTypeFunc
 }
 
 // decodeCustomType fields for custom types.
 type decodeCustomType struct {
-	fun    DecodeCustomTypeFunc
+	fn     DecodeCustomTypeFunc
 	fields []*decodeCustomTypeField
 }
 
 // Decoder to decode a form.
 type Decoder struct {
-	main       reflect.Value
-	formValues url.Values
-	opts       *DecoderOptions
+	main   reflect.Value   // reflect value of main struct/slice to decode
+	values url.Values      // all values of form
+	opts   *DecoderOptions // options
 
-	curr   reflect.Value
-	values []string
+	curr       reflect.Value // current field (as reflect value)
+	currValues []string      // values of current path to decode
 
-	path  string
-	field string
-	index string
+	path  string // current path
+	field string // current field (as string)
+	index string // current index/key of a field: slice/array/map
 	//isKey   bool
 
-	maps pathMaps
+	maps pathMaps // maps cached (it's decoded to the end)
 
-	customTypes map[reflect.Type]*decodeCustomType
+	customTypes map[reflect.Type]*decodeCustomType // custom types registered
 }
 
 // DecoderOptions options for decoding the values.
@@ -105,12 +104,12 @@ func (dec *Decoder) RegisterCustomType(fn DecodeCustomTypeFunc, types []interfac
 	for i := range types {
 		typ := reflect.TypeOf(types[i])
 		if dec.customTypes[typ] == nil {
-			dec.customTypes[typ] = &decodeCustomType{fun: fn, fields: make([]*decodeCustomTypeField, 0, lenFields)}
+			dec.customTypes[typ] = &decodeCustomType{fn: fn, fields: make([]*decodeCustomTypeField, 0, lenFields)}
 		}
 		if lenFields > 0 {
 			for j := range fields {
 				val := reflect.ValueOf(fields[j])
-				field := &decodeCustomTypeField{field: val, fun: fn}
+				field := &decodeCustomTypeField{field: val, fn: fn}
 				dec.customTypes[typ].fields = append(dec.customTypes[typ].fields, field)
 			}
 		}
@@ -141,7 +140,7 @@ func (dec Decoder) Decode(vs url.Values, dst interface{}) error {
 		return newError(ErrCodeNotAPointer, "", "", "dst %q is not a pointer", main.Kind())
 	}
 	dec.main = main.Elem()
-	dec.formValues = vs
+	dec.values = vs
 	return dec.init()
 }
 
@@ -153,8 +152,8 @@ func Decode(vs url.Values, dst interface{}) error {
 		return newError(ErrCodeNotAPointer, "", "", "dst %q is not a pointer", main.Kind())
 	}
 	dec := &Decoder{
-		main:       main.Elem(),
-		formValues: vs,
+		main:   main.Elem(),
+		values: vs,
 		opts: &DecoderOptions{
 			TagName: tagName,
 			MaxSize: maxSize,
@@ -166,9 +165,9 @@ func Decode(vs url.Values, dst interface{}) error {
 // init initializes the decoding
 func (dec Decoder) init() error {
 	// iterate over the form's values and decode it
-	for k, v := range dec.formValues {
+	for k, v := range dec.values {
 		dec.path = k
-		dec.values = v
+		dec.currValues = v
 		dec.curr = dec.main
 		if err := dec.analyzePath(); err != nil {
 			if dec.curr.Kind() == reflect.Struct && dec.opts.IgnoreUnknownKeys {
@@ -179,7 +178,7 @@ func (dec Decoder) init() error {
 	}
 	// set values of maps
 	for _, v := range dec.maps {
-		key := v.ma.Type().Key()
+		key := v.field.Type().Key()
 		ptr := false
 		// check if the key implements the UnmarshalText interface
 		var val reflect.Value
@@ -192,7 +191,7 @@ func (dec Decoder) init() error {
 		// decode key
 		dec.path = v.path
 		dec.field = v.path
-		dec.values = []string{v.key}
+		dec.currValues = []string{v.key}
 		dec.curr = val
 		//dec.isKey = true
 		if err := dec.decode(); err != nil {
@@ -203,7 +202,7 @@ func (dec Decoder) init() error {
 			dec.curr = dec.curr.Addr()
 		}
 		// set key with its value
-		v.ma.SetMapIndex(dec.curr, v.value)
+		v.field.SetMapIndex(dec.curr, v.value)
 	}
 	return nil
 }
@@ -347,13 +346,13 @@ func (dec *Decoder) traverseInMap(byField bool) {
 		if dec.maps == nil {
 			dec.maps = make(pathMaps, 0, 500)
 		}
-		m := reflect.New(n.Elem()).Elem()
+		val := reflect.New(n.Elem()).Elem()
 		if byField {
-			dec.maps = append(dec.maps, &pathMap{dec.curr, dec.field, m, dec.path})
+			dec.maps = append(dec.maps, &pathMap{dec.curr, dec.field, val, dec.path})
 		} else {
-			dec.maps = append(dec.maps, &pathMap{dec.curr, dec.index, m, dec.path})
+			dec.maps = append(dec.maps, &pathMap{dec.curr, dec.index, val, dec.path})
 		}
-		dec.curr = m
+		dec.curr = val
 	}
 	if dec.curr.IsNil() {
 		// map is nil
@@ -422,7 +421,7 @@ func (dec *Decoder) decode() error {
 		if dec.index == "" {
 			// not has index, so to decode all values in the slice
 			// only for slices
-			err := dec.expandSlice(len(dec.values))
+			err := dec.expandSlice(len(dec.currValues))
 			if err != nil {
 				return newError(ErrCodeArraySize, dec.field, dec.path, "%s", err)
 			}
@@ -446,9 +445,9 @@ func (dec *Decoder) decode() error {
 			return dec.decode()
 		}
 	case reflect.String:
-		dec.curr.SetString(dec.values[0])
+		dec.curr.SetString(dec.currValues[0])
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if num, err := strconv.ParseInt(dec.values[0], 10, dec.curr.Type().Bits()); err != nil {
+		if num, err := strconv.ParseInt(dec.currValues[0], 10, dec.curr.Type().Bits()); err != nil {
 			code := ErrCodeConversion
 			if err, ok := err.(*strconv.NumError); ok && err.Err == strconv.ErrRange {
 				code = ErrCodeRange
@@ -458,7 +457,7 @@ func (dec *Decoder) decode() error {
 			dec.curr.SetInt(num)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		if num, err := strconv.ParseUint(dec.values[0], 10, dec.curr.Type().Bits()); err != nil {
+		if num, err := strconv.ParseUint(dec.currValues[0], 10, dec.curr.Type().Bits()); err != nil {
 			code := ErrCodeConversion
 			if err, ok := err.(*strconv.NumError); ok && err.Err == strconv.ErrRange {
 				code = ErrCodeRange
@@ -468,7 +467,7 @@ func (dec *Decoder) decode() error {
 			dec.curr.SetUint(num)
 		}
 	case reflect.Float32, reflect.Float64:
-		if num, err := strconv.ParseFloat(dec.values[0], dec.curr.Type().Bits()); err != nil {
+		if num, err := strconv.ParseFloat(dec.currValues[0], dec.curr.Type().Bits()); err != nil {
 			code := ErrCodeConversion
 			if err, ok := err.(*strconv.NumError); ok && err.Err == strconv.ErrRange {
 				code = ErrCodeRange
@@ -478,7 +477,7 @@ func (dec *Decoder) decode() error {
 			dec.curr.SetFloat(num)
 		}
 	case reflect.Bool:
-		switch dec.values[0] {
+		switch dec.currValues[0] {
 		case "true", "on", "1", "checked":
 			dec.curr.SetBool(true)
 		default:
@@ -486,7 +485,7 @@ func (dec *Decoder) decode() error {
 			return nil
 		}
 	case reflect.Interface:
-		dec.curr.Set(reflect.ValueOf(dec.values[0]))
+		dec.curr.Set(reflect.ValueOf(dec.currValues[0]))
 	case reflect.Ptr:
 		n := reflect.New(dec.curr.Type().Elem())
 		if dec.curr.CanSet() {
@@ -501,16 +500,16 @@ func (dec *Decoder) decode() error {
 		case time.Time:
 			var t time.Time
 			// if the value is empty then no to try to parse it and leave "t" as a zero value to set it in the field
-			if dec.values[0] != "" {
+			if dec.currValues[0] != "" {
 				var err error
-				t, err = time.Parse("2006-01-02", dec.values[0])
+				t, err = time.Parse("2006-01-02", dec.currValues[0])
 				if err != nil {
 					return newError(ErrCodeConversion, dec.field, dec.path, "could not parse field: %s", err)
 				}
 			}
 			dec.curr.Set(reflect.ValueOf(t))
 		case url.URL:
-			u, err := url.Parse(dec.values[0])
+			u, err := url.Parse(dec.currValues[0])
 			if err != nil {
 				return newError(ErrCodeConversion, dec.field, dec.path, "could not parse field: %s", err)
 			}
@@ -618,9 +617,9 @@ func (dec *Decoder) expandSlice(length int) error {
 // setValues set the values in current slice/array
 func (dec *Decoder) setValues() error {
 	tmp := dec.curr // hold current field
-	for i, v := range dec.values {
+	for i, v := range dec.currValues {
 		dec.curr = tmp.Index(i)
-		dec.values[0] = v
+		dec.currValues[0] = v
 		if err := dec.decode(); err != nil {
 			return err
 		}
@@ -639,7 +638,7 @@ func (dec *Decoder) isCustomType() (bool, error) {
 				// check if the current field is registered
 				// in the fields of the custom type
 				if v.fields[i].field.Elem() == dec.curr {
-					va, err := v.fields[i].fun(dec.values)
+					va, err := v.fields[i].fn(dec.currValues)
 					if err != nil {
 						return true, err
 					}
@@ -649,8 +648,8 @@ func (dec *Decoder) isCustomType() (bool, error) {
 			}
 		}
 		// check if the default function exists for fields not specific
-		if v.fun != nil {
-			va, err := v.fun(dec.values)
+		if v.fn != nil {
+			va, err := v.fn(dec.currValues)
 			if err != nil {
 				return true, err
 			}
@@ -685,7 +684,7 @@ func (dec *Decoder) isUnmarshalText(v reflect.Value) (bool, error) {
 		return false, nil
 	}
 	// return result
-	return true, m.UnmarshalText([]byte(dec.values[0]))
+	return true, m.UnmarshalText([]byte(dec.currValues[0]))
 }
 
 // getTagName get tag by the name passed by argument
