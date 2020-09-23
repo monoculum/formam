@@ -774,8 +774,8 @@ func TestIgnoreBracketedKeysIgnoreStruct(t *testing.T) {
 		Name string `formam:"Name"`
 	}{}
 	vals := url.Values{
-		"Name":      []string{"Homer"},
 		"[Wife]":    []string{"Marge"},
+		"Name":      []string{"Homer"},
 		"His[Wife]": []string{"Marge"},
 	}
 	dec := formam.NewDecoder(&formam.DecoderOptions{
