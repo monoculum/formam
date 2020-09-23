@@ -240,9 +240,9 @@ func (dec *Decoder) analyzePath() (err error) {
 				lastPos = i + 1
 				// traverse the path
 				err = dec.traverse()
-				// set empty the index already used by traverse
+				// flush the index already used by traverse
 				dec.index = ""
-				// check if the traverse failed
+				// check if the "traverse" failed
 				if err != nil {
 					return
 				}
