@@ -176,6 +176,7 @@ func (dec Decoder) init() error {
 			return err
 		}
 	}
+
 	// set values of maps
 	for _, v := range dec.maps {
 		key := v.field.Type().Key()
@@ -683,7 +684,18 @@ func (dec *Decoder) isUnmarshalText(v reflect.Value) (bool, error) {
 	if n.ConvertibleTo(typeTime) || n.ConvertibleTo(typeTimePtr) {
 		return false, nil
 	}
-	// return result
+
+	// Run on all values if the path ends with [].
+	if strings.HasSuffix(dec.path, "[]") {
+		for _, v := range dec.currValues {
+			err := m.UnmarshalText([]byte(v))
+			if err != nil {
+				return true, err
+			}
+		}
+		return true, nil
+	}
+
 	return true, m.UnmarshalText([]byte(dec.currValues[0]))
 }
 

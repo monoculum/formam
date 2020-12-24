@@ -117,7 +117,10 @@ Supported types in the destination struct are:
 Custom Marshaling
 -----------------
 
-You can umarshal data and map keys by implementing the `encoding.TextUnmarshaler` interface.
+You can umarshal data and map keys by implementing the `encoding.TextUnmarshaler` interface. 
+
+If the forms sends multiple values then only the first value is passed to `UnmarshalText()`, but if the name ends with `[]` then it's called for all values.
+
 
 Custom Type
 -----------

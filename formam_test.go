@@ -1012,6 +1012,51 @@ func TestDisableUnmarshalText(t *testing.T) {
 	}
 }
 
+type AppendString string
+
+func (s *AppendString) UnmarshalText(data []byte) error {
+	*s += AppendString(data) + "-"
+	return nil
+}
+
+func TestUnmarshalTextList(t *testing.T) {
+	var s struct{ Append AppendString }
+
+	// No [], so use first value.
+	err := formam.Decode(url.Values{
+		"Append": []string{"banana", "chocolate"},
+	}, &s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Append != "banana-" {
+		t.Error(s.Append)
+	}
+
+	// [], so call for every value.
+	s.Append = ""
+	err = formam.Decode(url.Values{
+		"Append[]": []string{"banana", "chocolate"},
+	}, &s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Append != "banana-chocolate-" {
+		t.Error(s.Append)
+	}
+
+	// Append to existing
+	err = formam.Decode(url.Values{
+		"Append[]": []string{"cinnamon"},
+	}, &s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Append != "banana-chocolate-cinnamon-" {
+		t.Error(s.Append)
+	}
+}
+
 // errorContains checks if the error message in out contains the text in
 // want.
 //
