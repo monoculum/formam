@@ -104,6 +104,8 @@ type TestStruct struct {
 
 	// pointer
 	Pointer *string
+	// pointer to pointer
+	PointerToPointer **string
 	// pointer to struct
 	PointerToStruct *struct{ Field float64 }
 	// pointer to map
@@ -228,6 +230,7 @@ var vals = url.Values{
 
 	// pointer
 	"Pointer":               []string{"20"},
+	"PointerToPointer":      []string{"20"},
 	"PointerToStruct.Field": []string{"20"},
 	"PointerToMap[es]":      []string{"20"},
 	"PointerToSlice[0].ID":  []string{"20"},
@@ -467,6 +470,18 @@ func TestDecodeInStruct(t *testing.T) {
 		t.Error("Pointer is nil")
 	} else if *m.Pointer == "" {
 		t.Error("Pointer is not nil but is empty")
+	}
+	if m.PointerToPointer == nil {
+		t.Error("PointerToPointer is nil")
+	} else if *m.PointerToPointer == nil {
+		t.Error("PointerToPointer is not nil but nested pointer is nil")
+	} else if **m.PointerToPointer == "" {
+		t.Error("PointerToPointer and nested pointer is not nil but is empty")
+	}
+	if m.PointerToStruct == nil {
+		t.Error("PointerToStruct is nil")
+	} else if m.PointerToStruct.Field == 0.0 {
+		t.Error("PointerToStruct is not nil but is empty")
 	}
 	if m.PointerToMap == nil {
 		t.Error("Pointer is nil")
@@ -1025,4 +1040,74 @@ func errorContains(out error, want string) bool {
 		return false
 	}
 	return strings.Contains(out.Error(), want)
+}
+
+func TestUnbalancedBracketsAndNestedPointers(t *testing.T) {
+	var s struct {
+		MapStringString    map[string]string `formam:"MapStringString"`
+		MapStringPtrStruct map[string]*struct {
+			ID        string `formam:"ID"`
+			PtrStruct *struct {
+				String string `formam:"String"`
+			} `formam:"PtrStruct"`
+		} `formam:"MapStringPtrStruct"`
+		MapStringMapStringString map[string]map[string]string `formam:"MapStringMapStringString"`
+	}
+
+	vals := url.Values{
+		"MapStringString[a[b][c]d]":                []string{"MapStringString[a[b][c]d]"},
+		"MapStringString[name.with.dots]":          []string{"MapStringString[name.with.dots]"},
+		"MapStringPtrStruct[key].PtrStruct.String": []string{"MapStringPtrStruct[key].PtrStruct.String"},
+		"MapStringPtrStruct[k1].ID":                []string{"MapStringPtrStruct[k1].ID"},
+		"MapStringPtrStruct[k2]ID":                 []string{"MapStringPtrStruct[k2]ID"},
+		"MapStringMapStringString[a[b[c]d]]q]w":    []string{"MapStringMapStringString[a[b[c]d]]q]w"},
+	}
+
+	dec := formam.NewDecoder(nil)
+
+	if err := dec.Decode(vals, &s); err != nil {
+		t.Fatalf("error when decode %s", err)
+	}
+
+	if v, ok := s.MapStringString["a[b][c]d"]; !ok {
+		t.Error("The key \"a[b][c]d\" in MapStringString does not exists")
+	} else if v != "MapStringString[a[b][c]d]" {
+		t.Error("The value in key \"a[b][c]d\" of MapStringString is incorrect")
+	}
+
+	if v, ok := s.MapStringString["name.with.dots"]; !ok {
+		t.Error("The key \"name.with.dots\" in MapStringString does not exists")
+	} else if v != "MapStringString[name.with.dots]" {
+		t.Error("The value in key \"name.with.dots\" of MapStringString is incorrect")
+	}
+
+	if v, ok := s.MapStringPtrStruct["key"]; !ok {
+		t.Error("The key \"key\" in MapStringPtrStruct does not exists")
+	} else if v == nil {
+		t.Error("MapStringPtrStruct[key] is nil")
+	} else if v.PtrStruct == nil {
+		t.Error("MapStringPtrStruct[key].PtrStruct is nil")
+	} else if v.PtrStruct.String != "MapStringPtrStruct[key].PtrStruct.String" {
+		t.Error("The value of \"MapStringPtrStruct[key].PtrStruct.String\" is incorrect")
+	}
+
+	if v, ok := s.MapStringPtrStruct["k2"]; !ok {
+		t.Error("The key \"k2\" in MapStringPtrStruct does not exists")
+	} else if v.ID != "MapStringPtrStruct[k2]ID" {
+		t.Error("The value in key \"k2\" of MapStringPtrStruct is incorrect")
+	}
+
+	if v, ok := s.MapStringPtrStruct["k2"]; !ok {
+		t.Error("The key \"k2\" in MapStringPtrStruct does not exists")
+	} else if v.ID != "MapStringPtrStruct[k2]ID" {
+		t.Error("The value in key \"k2\" of MapStringPtrStruct is incorrect")
+	}
+
+	if v, ok := s.MapStringMapStringString["a[b[c]d]"]; !ok {
+		t.Error("The key \"a[b[c]d]\" in MapStringMapStringString does not exists")
+	} else if vv, ok := v["q]w"]; !ok {
+		t.Error("The key \"q]w\" in MapStringMapStringString[a[b[c]d]] does not exists")
+	} else if vv != "MapStringMapStringString[a[b[c]d]]q]w" {
+		t.Error("The value in key \"q]w\" of MapStringMapStringString[a[b[c]d]] is incorrect")
+	}
 }

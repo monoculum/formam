@@ -210,65 +210,71 @@ func (dec Decoder) init() error {
 // analyzePath analyzes the current path to walk through it.
 // For example: users[0].name
 func (dec *Decoder) analyzePath() (err error) {
-	inBracket := false
-	bracketClosed := false
+	traversedByBracket := false
+	nesting := 0
 	lastPos := 0
-	endPos := 0
 
 	// parse path
 	for i, char := range []byte(dec.path) {
-		if char == '[' && inBracket == false {
-			// found an opening bracket
-			bracketClosed = false
-			inBracket = true
+		switch char {
+		case '[':
+			// save current access field
+			if nesting == 0 {
+				traversedByBracket = false
+				dec.field = dec.path[lastPos:i]
+				lastPos = i + 1
+			}
+			nesting += 1
+
+		case ']':
+			// no matching open bracket - regular character
+			if nesting == 0 {
+				continue
+			}
+
+			// decrease nesting
+			nesting -= 1
+			// if still inside outer brackets - regular character
+			// for example: [nested[brackets]]
+			if nesting > 0 {
+				continue
+			}
+
+			traversedByBracket = true
+			dec.index = dec.path[lastPos:i]
+			lastPos = i + 1
+			// traverse the path
+			err = dec.traverse()
+			// flush the index already used by traverse
+			dec.index = ""
+			// check if the "traverse" failed
+			if err != nil {
+				return
+			}
+
+		case '.':
+			// inside brackets - regular character
+			// for example: [key.with.dots]
+			if nesting > 0 {
+				continue
+			}
+
+			// found a field, we need to know if the field is next to a closing bracket,
+			// if it is then no need to traverse again
+			// for example: [0].Field
+			if traversedByBracket {
+				traversedByBracket = false
+				lastPos = i + 1
+				continue
+			}
+
+			// found a field, but is not next to a closing bracket,
+			// for example: Field1.Field2
 			dec.field = dec.path[lastPos:i]
 			lastPos = i + 1
-			continue
-		} else if inBracket {
-			// it is inside of bracket, so get its value
-			if char == ']' {
-				// found an closing bracket, so it will be recently close, so put as true the bracketClosed
-				// and put as false inBracket and pass the value of bracket to dec.key
-				inBracket = false
-				bracketClosed = true
-				if endPos == 0 { // foo[] without number.
-					dec.index = dec.path[lastPos:i]
-				} else {
-					dec.index = dec.path[lastPos:endPos]
-				}
-				lastPos = i + 1
-				// traverse the path
-				err = dec.traverse()
-				// flush the index already used by traverse
-				dec.index = ""
-				// check if the "traverse" failed
-				if err != nil {
-					return
-				}
-			} else {
-				// still inside the bracket, so to save the end position
-				endPos = i + 1
+			if err = dec.traverse(); err != nil {
+				return
 			}
-			continue
-		} else if !inBracket {
-			// not found any bracket, so try found a field
-			if char == '.' {
-				// found a field, we need to know if the field is next of a closing bracket,
-				// for example: [0].Field
-				if bracketClosed {
-					bracketClosed = false
-					lastPos = i + 1
-					continue
-				}
-				// found a field, but is not next of a closing bracket, for example: Field1.Field2
-				dec.field = dec.path[lastPos:i]
-				//dec.field = tmp[:i]
-				lastPos = i + 1
-				if err = dec.traverse(); err != nil {
-					return
-				}
-			}
-			continue
 		}
 	}
 
@@ -284,6 +290,8 @@ func (dec *Decoder) analyzePath() (err error) {
 func (dec *Decoder) traverse() error {
 	// check if there is field, if is so, then it should be struct or map (access by .)
 	if dec.field != "" {
+		dec.traverseIndirect()
+
 		// check if is a struct or map
 		switch dec.curr.Kind() {
 		case reflect.Struct:
@@ -296,26 +304,21 @@ func (dec *Decoder) traverse() error {
 		}
 		dec.field = ""
 	}
-	// check if is a interface and it is not nil. This mean that the interface
-	// has a struct, map or slice as value
-	if dec.curr.Kind() == reflect.Interface && !dec.curr.IsNil() {
-		dec.curr = dec.curr.Elem()
-	}
-	// check if it is a pointer
-	if dec.curr.Kind() == reflect.Ptr {
-		if dec.curr.IsNil() {
-			dec.curr.Set(reflect.New(dec.curr.Type().Elem()))
-		}
-		dec.curr = dec.curr.Elem()
-	}
+
 	// check if there is access to slice/array or map (access by [])
 	if dec.index != "" {
+		dec.traverseIndirect()
+
 		switch dec.curr.Kind() {
 		case reflect.Array:
 			index, err := strconv.Atoi(dec.index)
 			if err != nil {
 				return newError(ErrCodeArrayIndex, dec.field, dec.path, "array index is not a number: %s", err)
 			}
+			if dec.curr.Len() <= index {
+				return newError(ErrCodeArrayIndex, dec.field, dec.path, "array index is out of bounds")
+			}
+
 			dec.curr = dec.curr.Index(index)
 		case reflect.Slice:
 			index, err := strconv.Atoi(dec.index)
@@ -337,6 +340,29 @@ func (dec *Decoder) traverse() error {
 		}
 	}
 	return nil
+}
+
+func (dec *Decoder) traverseIndirect() {
+loop:
+	// nested indirections
+	for {
+		switch {
+		// check if is a interface and it is not nil. This mean that the interface
+		// has a struct, map or slice as value
+		case dec.curr.Kind() == reflect.Interface && !dec.curr.IsNil():
+			dec.curr = dec.curr.Elem()
+
+		// check if it is a pointer
+		case dec.curr.Kind() == reflect.Ptr:
+			if dec.curr.IsNil() {
+				dec.curr.Set(reflect.New(dec.curr.Type().Elem()))
+			}
+			dec.curr = dec.curr.Elem()
+
+		default:
+			break loop
+		}
+	}
 }
 
 // walkMap puts in Decoder.curr the map concrete for decode the current value
