@@ -296,19 +296,10 @@ func (dec *Decoder) traverse() error {
 			dec.traverseInMap(true)
 		}
 		dec.field = ""
+
+		dec.traverseIndirect()
 	}
-	// check if is a interface and it is not nil. This mean that the interface
-	// has a struct, map or slice as value
-	if dec.curr.Kind() == reflect.Interface && !dec.curr.IsNil() {
-		dec.curr = dec.curr.Elem()
-	}
-	// check if it is a pointer
-	if dec.curr.Kind() == reflect.Ptr {
-		if dec.curr.IsNil() {
-			dec.curr.Set(reflect.New(dec.curr.Type().Elem()))
-		}
-		dec.curr = dec.curr.Elem()
-	}
+
 	// check if there is access to slice/array or map (access by [])
 	if dec.index != "" {
 		switch dec.curr.Kind() {
@@ -340,8 +331,26 @@ func (dec *Decoder) traverse() error {
 		default:
 			return newError(ErrCodeArrayIndex, dec.field, dec.path, "has an array index but it is a %v", dec.curr.Kind())
 		}
+
+		dec.traverseIndirect()
 	}
+
 	return nil
+}
+
+func (dec *Decoder) traverseIndirect() {
+	// check if is a interface and it is not nil. This mean that the interface
+	// has a struct, map or slice as value
+	if dec.curr.Kind() == reflect.Interface && !dec.curr.IsNil() {
+		dec.curr = dec.curr.Elem()
+	}
+	// check if it is a pointer
+	if dec.curr.Kind() == reflect.Ptr {
+		if dec.curr.IsNil() {
+			dec.curr.Set(reflect.New(dec.curr.Type().Elem()))
+		}
+		dec.curr = dec.curr.Elem()
+	}
 }
 
 // walkMap puts in Decoder.curr the map concrete for decode the current value
