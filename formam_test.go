@@ -1057,6 +1057,24 @@ func TestUnmarshalTextList(t *testing.T) {
 	}
 }
 
+// #40
+func TestArrayIndexIsOutOfBoundsError(t *testing.T) {
+	s := struct {
+		Array [2]string
+	}{}
+
+	vals := url.Values{
+		"Array[2]": []string{"10"},
+	}
+
+	dec := formam.NewDecoder(nil)
+	err := dec.Decode(vals, &s)
+
+	if !errorContains(err, "array index is out of bounds") {
+		t.Fatalf("wrong error: %s", err)
+	}
+}
+
 // errorContains checks if the error message in out contains the text in
 // want.
 //

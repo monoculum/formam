@@ -317,6 +317,10 @@ func (dec *Decoder) traverse() error {
 			if err != nil {
 				return newError(ErrCodeArrayIndex, dec.field, dec.path, "array index is not a number: %s", err)
 			}
+			if dec.curr.Len() <= index {
+				return newError(ErrCodeArrayIndex, dec.field, dec.path, "array index is out of bounds")
+			}
+
 			dec.curr = dec.curr.Index(index)
 		case reflect.Slice:
 			index, err := strconv.Atoi(dec.index)
