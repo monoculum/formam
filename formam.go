@@ -281,11 +281,10 @@ func (dec *Decoder) analyzePath() (err error) {
 	return dec.decode()
 }
 
-// walk traverses the current path until to the last field
+// Traverses the current path until to the last field.
 func (dec *Decoder) traverse() error {
-	// check if there is field, if is so, then it should be struct or map (access by .)
+	//  If there is field ("foo.fieldname"), then it should be struct or map.
 	if dec.field != "" {
-		// check if is a struct or map
 		switch dec.curr.Kind() {
 		case reflect.Struct:
 			if err := dec.findStructField(); err != nil {
@@ -300,7 +299,7 @@ func (dec *Decoder) traverse() error {
 		dec.traverseIndirect()
 	}
 
-	// check if there is access to slice/array or map (access by [])
+	// If there's an index ("foo[index]") then access the slice, array, or map.
 	if dec.index != "" {
 		switch dec.curr.Kind() {
 		case reflect.Array:
@@ -338,12 +337,14 @@ func (dec *Decoder) traverse() error {
 	return nil
 }
 
+// Resolve pointers to their concrete types.
 func (dec *Decoder) traverseIndirect() {
 	// check if is a interface and it is not nil. This mean that the interface
 	// has a struct, map or slice as value
 	if dec.curr.Kind() == reflect.Interface && !dec.curr.IsNil() {
 		dec.curr = dec.curr.Elem()
 	}
+
 	// check if it is a pointer
 	if dec.curr.Kind() == reflect.Ptr {
 		if dec.curr.IsNil() {

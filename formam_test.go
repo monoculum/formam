@@ -1117,9 +1117,11 @@ func TestMapToPtrStruct(t *testing.T) {
 		t.Fatalf("error when decode %s", err)
 	}
 
-	if v, ok := s.M["key"]; !ok {
-		t.Error("The key \"key\" in M does not exists")
-	} else if v.ID != "M[key].ID" {
-		t.Error("The value in key \"key\" of M is incorrect")
+	v, ok := s.M["key"]
+	if !ok {
+		t.Fatal("The key \"key\" in M does not exists")
+	}
+	if v.ID != "M[key].ID" {
+		t.Errorf("The value in key \"key\" of M is incorrect: %q", v.ID)
 	}
 }
