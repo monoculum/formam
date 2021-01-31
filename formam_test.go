@@ -1099,3 +1099,29 @@ func errorContains(out error, want string) bool {
 	}
 	return strings.Contains(out.Error(), want)
 }
+
+// #42
+func TestMapToPtrStruct(t *testing.T) {
+	s := struct {
+		M map[string]*struct {
+			ID string
+		}
+	}{}
+
+	vals := url.Values{
+		"M[key].ID": []string{"M[key].ID"},
+	}
+
+	dec := formam.NewDecoder(nil)
+	if err := dec.Decode(vals, &s); err != nil {
+		t.Fatalf("error when decode %s", err)
+	}
+
+	v, ok := s.M["key"]
+	if !ok {
+		t.Fatal("The key \"key\" in M does not exists")
+	}
+	if v.ID != "M[key].ID" {
+		t.Errorf("The value in key \"key\" of M is incorrect: %q", v.ID)
+	}
+}
