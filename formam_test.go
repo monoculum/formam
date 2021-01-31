@@ -1063,15 +1063,25 @@ func TestArrayIndexIsOutOfBoundsError(t *testing.T) {
 		Array [2]string
 	}{}
 
-	vals := url.Values{
-		"Array[2]": []string{"10"},
-	}
-
 	dec := formam.NewDecoder(nil)
-	err := dec.Decode(vals, &s)
-
+	err := dec.Decode(url.Values{
+		"Array[2]": []string{"10"},
+	}, &s)
 	if !errorContains(err, "array index is out of bounds") {
 		t.Fatalf("wrong error: %s", err)
+	}
+	if s.Array[0] != "" || s.Array[1] != "" {
+		t.Errorf("wrong value: %#v", s.Array)
+	}
+
+	err = dec.Decode(url.Values{
+		"Array[1]": []string{"10"},
+	}, &s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Array[0] != "" || s.Array[1] != "10" {
+		t.Errorf("wrong value: %#v", s.Array)
 	}
 }
 
