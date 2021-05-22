@@ -737,6 +737,59 @@ func TestIgnoreUnknownKeys(t *testing.T) {
 	}
 }
 
+func TestIgnoreUnknownKeysDoubleEmbedded(t *testing.T) {
+	type Embedded0 struct {
+		Foo0 string
+		Bar0 string
+	}
+
+	type Embedded1 struct {
+		Foo1 string
+		Bar1 string
+	}
+
+	s := struct {
+		Embedded0
+		Embedded1
+		Name  string `formam:"Name"`
+		Map   map[string]string
+		Slice []string
+	}{}
+
+	vals := url.Values{
+		"Name":      []string{"Homer"},
+		"Foo0":      []string{"Bar"},
+		"Bar0":      []string{"Foo"},
+		"Foo1":      []string{"Bar"},
+		"Bar1":      []string{"Foo"},
+		"City":      []string{"Springfield"},
+		"Children.": []string{"Bart", "Lisa"},
+		"Job[":      []string{"Safety inspector"},
+	}
+	dec := formam.NewDecoder(&formam.DecoderOptions{
+		IgnoreUnknownKeys: true,
+	})
+	err := dec.Decode(vals, &s)
+	if err != nil {
+		t.Error(err)
+	}
+	if s.Name != "Homer" {
+		t.Errorf("Expected Homer got %s", s.Name)
+	}
+	if s.Embedded0.Foo0 != "Bar" {
+		t.Errorf("Expected Bar got %s", s.Embedded0.Foo0)
+	}
+	if s.Embedded0.Bar0 != "Foo" {
+		t.Errorf("Expected Foo got %s", s.Embedded0.Bar0)
+	}
+	if s.Embedded1.Foo1 != "Bar" {
+		t.Errorf("Expected Bar got %s", s.Embedded1.Foo1)
+	}
+	if s.Embedded1.Bar1 != "Foo" {
+		t.Errorf("Expected Foo got %s", s.Embedded1.Bar1)
+	}
+}
+
 func TestIgnoreBracketedKeysError(t *testing.T) {
 	s := struct {
 		Name string `formam:"Name"`
