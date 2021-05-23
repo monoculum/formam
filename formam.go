@@ -583,7 +583,15 @@ func (dec *Decoder) findStructField() error {
 				}
 				dec.curr = dec.curr.Elem()
 			}
-			if err := dec.findStructField(); err != nil {
+
+			// Disable ignore unknown keys for anonymous struct check.
+			// Otherwise we don't know the field is missing.
+			tmpIgnoreUnknownKeys := dec.opts.IgnoreUnknownKeys
+			dec.opts.IgnoreUnknownKeys = false
+			err := dec.findStructField()
+			dec.opts.IgnoreUnknownKeys = tmpIgnoreUnknownKeys
+
+			if err != nil {
 				dec.curr = tmp
 				continue
 			}
