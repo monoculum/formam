@@ -1178,3 +1178,52 @@ func TestMapToPtrStruct(t *testing.T) {
 		t.Errorf("The value in key \"key\" of M is incorrect: %q", v.ID)
 	}
 }
+
+func TestBracketsAndNestedPointers(t *testing.T) {
+	var s struct {
+		MapStringString    map[string]string
+		MapStringPtrStruct map[string]struct {
+			ID string
+		}
+		MapStringMapStringString map[string]map[string]string
+	}
+
+	vals := url.Values{
+		"MapStringString[a[b][c]d]":             []string{"MapStringString[a[b][c]d]"},
+		"MapStringString[name.with.dots]":       []string{"MapStringString[name.with.dots]"},
+		"MapStringPtrStruct[k2]ID":              []string{"MapStringPtrStruct[k2]ID"},
+		"MapStringMapStringString[a[b[c]d]]q]w": []string{"MapStringMapStringString[a[b[c]d]]q]w"},
+	}
+
+	dec := formam.NewDecoder(nil)
+
+	if err := dec.Decode(vals, &s); err != nil {
+		t.Fatalf("error when decode %s", err)
+	}
+
+	if v, ok := s.MapStringString["a[b][c]d"]; !ok {
+		t.Error("The key \"a[b][c]d\" in MapStringString does not exists")
+	} else if v != "MapStringString[a[b][c]d]" {
+		t.Error("The value in key \"a[b][c]d\" of MapStringString is incorrect")
+	}
+
+	if v, ok := s.MapStringString["name.with.dots"]; !ok {
+		t.Error("The key \"name.with.dots\" in MapStringString does not exists")
+	} else if v != "MapStringString[name.with.dots]" {
+		t.Error("The value in key \"name.with.dots\" of MapStringString is incorrect")
+	}
+
+	if v, ok := s.MapStringPtrStruct["k2"]; !ok {
+		t.Error("The key \"k2\" in MapStringPtrStruct does not exists")
+	} else if v.ID != "MapStringPtrStruct[k2]ID" {
+		t.Error("The value in key \"k2\" of MapStringPtrStruct is incorrect")
+	}
+
+	if v, ok := s.MapStringMapStringString["a[b[c]d]"]; !ok {
+		t.Error("The key \"a[b[c]d]\" in MapStringMapStringString does not exists")
+	} else if vv, ok := v["q]w"]; !ok {
+		t.Error("The key \"q]w\" in MapStringMapStringString[a[b[c]d]] does not exists")
+	} else if vv != "MapStringMapStringString[a[b[c]d]]q]w" {
+		t.Error("The value in key \"q]w\" of MapStringMapStringString[a[b[c]d]] is incorrect")
+	}
+}
