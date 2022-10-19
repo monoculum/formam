@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/monoculum/formam"
+	"github.com/monoculum/formam/v3"
 )
 
 type Text string
@@ -1177,4 +1177,60 @@ func TestMapToPtrStruct(t *testing.T) {
 	if v.ID != "M[key].ID" {
 		t.Errorf("The value in key \"key\" of M is incorrect: %q", v.ID)
 	}
+}
+
+func TestTimeFormats(t *testing.T) {
+	newdec := func(formats ...string) *formam.Decoder {
+		return formam.NewDecoder(&formam.DecoderOptions{
+			TimeFormats: formats,
+		})
+	}
+
+	var s struct{ T time.Time }
+	err := newdec("2006-01-02", "2006-01-02 15:04:05").Decode(url.Values{"T": {"1985-06-18 13:37:00"}}, &s)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = newdec("2006-01-02 15:04:05", "2006-01-02").Decode(url.Values{"T": {"1985-06-18 13:37:00"}}, &s)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = newdec("2006-01-02").Decode(url.Values{"T": {"1985-06-18 13:37:00"}}, &s)
+	if err == nil || !strings.Contains(err.Error(), "suitable time formats") {
+		t.Errorf("wrong error: %s", err)
+	}
+
+	t.Run("sets zero value on empty value", func(t *testing.T) {
+		err = newdec("2006-01-02").Decode(url.Values{"T": {""}}, &s)
+		if err != nil {
+			t.Error(err)
+		}
+		if !s.T.IsZero() {
+			t.Errorf("not zero value: %s", s.T)
+		}
+	})
+
+	t.Run("leaves struct alone if there's no value", func(t *testing.T) {
+		d := time.Date(1953, 3, 5, 15, 19, 1, 123, time.UTC)
+		s.T = d
+		err = newdec("2006-01-02").Decode(url.Values{}, &s)
+		if err != nil {
+			t.Error(err)
+		}
+		if !s.T.Equal(d) {
+			t.Errorf("%s should be %s", s.T, d)
+		}
+	})
+
+	t.Run("sets timezone", func(t *testing.T) {
+		err = newdec("2006-01-02 15:04:05-0700").Decode(url.Values{"T": {"2000-01-01 00:00:00+0800"}}, &s)
+		if err != nil {
+			t.Error(err)
+		}
+		if str := s.T.UTC().String(); str != "1999-12-31 16:00:00 +0000 UTC" {
+			t.Fatal(str)
+		}
+	})
 }
