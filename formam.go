@@ -93,6 +93,10 @@ type DecoderOptions struct {
 	//
 	// The default is 16,000; set to -1 to disable.
 	MaxSize int
+
+	// Timeformats to try for time.Time fields; the first one that doesn't
+	// return an error for the field is used. Default is [2006-01-02].
+	TimeFormats []string
 }
 
 // RegisterCustomType registers a functions for decoding custom types.
@@ -128,6 +132,9 @@ func NewDecoder(opts *DecoderOptions) *Decoder {
 	}
 	if dec.opts.MaxSize == 0 {
 		dec.opts.MaxSize = maxSize
+	}
+	if len(dec.opts.TimeFormats) == 0 {
+		dec.opts.TimeFormats = []string{"2006-01-02"}
 	}
 	return dec
 }
@@ -513,16 +520,19 @@ func (dec *Decoder) decode() error {
 	case reflect.Struct:
 		switch dec.curr.Interface().(type) {
 		case time.Time:
-			var t time.Time
-			// if the value is empty then no to try to parse it and leave "t" as a zero value to set it in the field
-			if dec.currValues[0] != "" {
-				var err error
-				t, err = time.Parse("2006-01-02", dec.currValues[0])
-				if err != nil {
-					return newError(ErrCodeConversion, dec.field, dec.path, "could not parse field: %s", err)
+			// Set field to zero value if the value is empty.
+			if dec.currValues[0] == "" {
+				dec.curr.Set(reflect.ValueOf(time.Time{}))
+				return nil
+			}
+			for _, f := range dec.opts.TimeFormats {
+				t, err := time.Parse(f, dec.currValues[0])
+				if err == nil {
+					dec.curr.Set(reflect.ValueOf(t))
+					return nil
 				}
 			}
-			dec.curr.Set(reflect.ValueOf(t))
+			return newError(ErrCodeConversion, dec.field, dec.path, "could not parse field: no suitable time formats")
 		case url.URL:
 			u, err := url.Parse(dec.currValues[0])
 			if err != nil {

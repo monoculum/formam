@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/monoculum/formam"
+	"github.com/monoculum/formam/v3"
 )
 
 type Simple struct {
